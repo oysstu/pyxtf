@@ -2,7 +2,6 @@ from pyxtf.xtf_ctypes import *
 import ctypes
 from io import BytesIO
 import numpy as np
-import matplotlib.pyplot as plt
 from typing import List, Tuple, Callable, Any, Dict
 import warnings
 
@@ -25,7 +24,7 @@ def xtf_padding(size: int) -> int:
     return ((size + 63) // 64) * 64
 
 
-def xtf_channel_count(file_header: XTFFileHeader, verbose: bool = False) -> int:
+def channel_count(file_header: XTFFileHeader, verbose: bool = False) -> int:
     """
     Returns the number of separate channels present in the XTF file.
     :param file_header: The file header of the XTF file.
@@ -57,7 +56,7 @@ def xtf_read(path: str, verbose: bool = False) -> Tuple[XTFFileHeader, Dict[XTFH
         # Read initial file header
         file_header = XTFFileHeader(buffer=f)
 
-        n_channels = xtf_channel_count(file_header, verbose)
+        n_channels = channel_count(file_header, verbose)
         if n_channels > 6:
             raise NotImplementedError("Support for more than 6 channels not implemented.")
 
@@ -206,6 +205,7 @@ def concatenate_channel(pings: List[XTFPingHeader], chan_info: XTFChanInfo, chan
             sz = ping.data[channel].shape[0]
             if chan_type == XTFChannelType.stbd:
                 out_array[i, :sz] = ping.data[channel]
+                ping.ping_chan_headers
                 out_array[i, sz:] = 0
             elif chan_type == XTFChannelType.port:
                 out_array[i, :max_sz-sz] = 0
@@ -221,6 +221,8 @@ def concatenate_channel(pings: List[XTFPingHeader], chan_info: XTFChanInfo, chan
         return out_array
 
 if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+
     test_path = r'..\data\DemoFiles\Isis_Sonar_XTF\Reson7125.XTF'
     (fh, p) = xtf_read(test_path, verbose=True)
 
