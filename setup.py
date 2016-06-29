@@ -17,7 +17,7 @@ def main():
           url='https://github.com/oysstu/pyxtf',
           license='MIT',
           setup_requires=['numpy'],
-          install_requires=['numpy', 'matplotlib'],
+          install_requires=['numpy'],
           packages=['pyxtf', 'pyxtf.vendors'],
           package_data={'':['*.pyi']},
           use_2to3=False,
