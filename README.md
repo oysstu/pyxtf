@@ -37,7 +37,7 @@ sonar_packets = packets[pyxtf.XTFHeaderType.sonar]
 print(sonar_packets[0])
 ```
 
-A more involved example can be found in the [ipython notebook under examples](http://nbviewer.jupyter.org/github/oysstu/pyxtf/blob/master/examples/sonar_example.ipynb).
+A more involved example can be found in the [ipython notebook under examples](examples/sonar_example.ipynb).
 
 ##### Scope
 There already exists a python2 project called [pyxtf](https://github.com/shamrin/pyxtf), but was more limited in scope than my needs. A better name might've been pyxtf3 to differentiate, but seeing as that project seems abandonded this project will most likely supersede that project in time. A reason for creating a completely new project, is that this project is based on ctypes - while the other pyxtf uses the struct parsing module. The motivation was not performance, but personal preference.
