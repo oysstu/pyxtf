@@ -9,7 +9,7 @@ use little endian byte ordering. Beware that others might not.
 # TODO: Implement automatic byte order check, and covert each field to little endian (or change the base class)
 
 import ctypes
-from enum import Enum, unique
+from enum import IntEnum, unique
 from io import IOBase, BytesIO
 import numpy as np
 from pyxtf.xtf_ctypes import ctype_struct_tostring, ctype_new_from_buffer
@@ -17,7 +17,7 @@ import warnings
 
 
 @unique
-class KMDatagramType(Enum):
+class KMDatagramType(IntEnum):
     depth = 0x44
     xyz_88 = 0x58
     extra_detections = 0x6C
