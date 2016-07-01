@@ -197,45 +197,62 @@ assert XTFSonarType.fsi_hms6x5 != 69, 'XTFSonarType enumeration ends on incorrec
 
 #endregion
 
-#region Util
-
-
-def ctype_struct_tostring(obj: ctypes.Structure) -> str:
-    """
-    Used to convert a ctype-structure to a string representation (for printing).
-    :param obj: The structure object
-    :return: String where each row is Name: Value
-    """
-    out_str = ''
-    for field_name, field_type in obj._fields_:
-        if ctypes.Array in field_type.__bases__ and field_type._type_ not in [ctypes.c_char, ctypes.c_wchar]:
-            out_str += '{}: {}\n'.format(field_name, list(getattr(obj, field_name)))
-        else:
-            out_str += '{}: {}\n'.format(field_name, getattr(obj, field_name))
-    return out_str
-
-
-def ctype_new_from_buffer(cls, buffer: IOBase = None):
-    if buffer:
-        if type(buffer) in [bytes, bytearray]:
-            buffer = BytesIO(buffer)
-
-        header_bytes = buffer.read(ctypes.sizeof(cls))
-        if not header_bytes:
-            raise RuntimeError('XTF file shorter than expected (end hit while reading {})'.format(cls.__name__))
-
-        obj = cls.from_buffer_copy(header_bytes)
-    else:
-        obj = super(cls).__new__(cls)
-
-    return obj
-
-#endregion Util
-
 #region C-Types
 
 
-class XTFChanInfo(ctypes.LittleEndianStructure):
+class XTFBase(ctypes.LittleEndianStructure):
+    """
+    Base class for all XTF ctypes.Structure children.
+    Exposes basic utility like printing of fields and constructing class from a buffer.
+    """
+    def __str__(self):
+        """
+        Prints the fields in the class (with ctype-fields) in the order in which they appear in the structure.
+        """
+        fields = []
+        for field_name in dir(self):
+            if not field_name.startswith('_') and not field_name.endswith('_'):
+                field_value = getattr(self, field_name)
+                field_type = type(field_value)
+
+                if hasattr(self.__class__, field_name) and hasattr(getattr(self.__class__, field_name), 'offset'):
+                    offset = getattr(self.__class__, field_name).offset
+                else:
+                    offset = 2 ** 31
+
+                if ctypes.Array in field_type.__bases__ and field_type._type_ not in [ctypes.c_char, ctypes.c_wchar]:
+                    out_str = '{}: {}\n'.format(field_name, list(field_value))
+                else:
+                    out_str = '{}: {}\n'.format(field_name, field_value)
+
+                fields.append((offset, out_str))
+
+        # Sort by offset (non-ctypes placed last)
+        fields.sort(key=lambda x: x[0])
+        out = ''.join(field[1] for field in fields)
+
+        return out
+
+    def __new__(cls, buffer: IOBase = None):
+        if buffer:
+            if type(buffer) in [bytes, bytearray]:
+                buffer = BytesIO(buffer)
+
+            header_bytes = buffer.read(ctypes.sizeof(cls))
+            if not header_bytes:
+                raise RuntimeError('XTF file shorter than expected (end hit while reading {})'.format(cls.__name__))
+
+            obj = cls.from_buffer_copy(header_bytes)
+        else:
+            obj = ctypes.LittleEndianStructure.__new__(cls)
+
+        return obj
+
+    def __init__(self, buffer=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class XTFChanInfo(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('TypeOfChannel', ctypes.c_uint8),
@@ -260,19 +277,13 @@ class XTFChanInfo(ctypes.LittleEndianStructure):
         ('ReservedArea2', ctypes.c_uint8 * 54)
     ]
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
-
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         if not buffer:
             self.Reserved = 1024  # For compatibility reasons with old viewers
 
 
-class XTFFileHeader(ctypes.LittleEndianStructure):
+class XTFFileHeader(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('FileFormat', ctypes.c_uint8),
@@ -311,14 +322,8 @@ class XTFFileHeader(ctypes.LittleEndianStructure):
         ('ChanInfo', XTFChanInfo * 6)
     ]
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
-
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
 
         if not buffer:
             self.FileFormat = 0x7B
@@ -330,9 +335,9 @@ class XTFFileHeader(ctypes.LittleEndianStructure):
                 self.RecordingProgramVersion = b'223'
 
 
-class XTFPacketStart(ctypes.LittleEndianStructure):
+class XTFPacket(XTFBase):
     """
-    This is a structure representing the first few bytes in every XTF packet.
+    This is a structure representing the first few bytes in (most) of the XTF packets.
     It can be used to inspect the packet type before reading the whole header.
     """
     _pack_ = 1
@@ -346,7 +351,7 @@ class XTFPacketStart(ctypes.LittleEndianStructure):
     ]
 
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
@@ -354,21 +359,10 @@ class XTFPacketStart(ctypes.LittleEndianStructure):
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.user_defined
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-class XTFAttitudeData(ctypes.LittleEndianStructure):
+class XTFAttitudeData(XTFPacket):
     _pack_ = 1
     _fields_ = [
-        ('MagicNumber', ctypes.c_uint16),
-        ('HeaderType', ctypes.c_uint8),
-        ('SubChannelNumber', ctypes.c_uint8),
-        ('NumChansToFollow', ctypes.c_uint16),
-        ('Reserved1', ctypes.c_uint16 * 2),
-        ('NumBytesThisRecord', ctypes.c_uint32),
         ('Reserved2', ctypes.c_uint32 * 2),
         ('EpochMicroseconds', ctypes.c_uint32),
         ('SourceEpoch', ctypes.c_uint32),
@@ -389,7 +383,7 @@ class XTFAttitudeData(ctypes.LittleEndianStructure):
         ]
 
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
@@ -397,22 +391,10 @@ class XTFAttitudeData(ctypes.LittleEndianStructure):
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.attitude
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-
-class XTFNotesHeader(ctypes.LittleEndianStructure):
+class XTFNotesHeader(XTFPacket):
     _pack_ = 1
     _fields_ = [
-        ('MagicNumber', ctypes.c_uint16),
-        ('HeaderType', ctypes.c_uint8),
-        ('SubChannelNumber', ctypes.c_uint8),
-        ('NumChansToFollow', ctypes.c_uint16),
-        ('Reserved', ctypes.c_uint16 * 2),
-        ('NumBytesThisRecord', ctypes.c_uint32),
         ('Year', ctypes.c_uint16),
         ('Month', ctypes.c_uint8),
         ('Day', ctypes.c_uint8),
@@ -424,7 +406,7 @@ class XTFNotesHeader(ctypes.LittleEndianStructure):
     ]
 
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
@@ -432,22 +414,10 @@ class XTFNotesHeader(ctypes.LittleEndianStructure):
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.notes.value
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-
-class XTFRawSerialHeader(ctypes.LittleEndianStructure):
+class XTFRawSerialHeader(XTFPacket):
     _pack_ = 1
     _fields_ = [
-        ('MagicNumber', ctypes.c_uint16),
-        ('HeaderType', ctypes.c_uint8),
-        ('SerialPort', ctypes.c_uint8),
-        ('NumChansToFollow', ctypes.c_uint16),
-        ('Reserved', ctypes.c_uint16 * 2),
-        ('NumBytesThisRecord', ctypes.c_uint32),  # Number of bytes without padding (header+data)
         ('Year', ctypes.c_uint16),
         ('Month', ctypes.c_uint8),
         ('Day', ctypes.c_uint8),
@@ -460,10 +430,21 @@ class XTFRawSerialHeader(ctypes.LittleEndianStructure):
         ('StringSize', ctypes.c_uint16)  # After this, the number of ascii bytes follow
     ]
 
+    # Serialport and subchannelnumber is the same variable
+    # The documentation uses serialport, so this redirection is added to match the docs
+    @property
+    def SerialPort(self):
+        return self.SubChannelNumber
+
+    @SerialPort.setter
+    def SerialPort(self, value):
+        self.SubChannelNumber = value
+
     # Just declaration of variables to more easily generate entries in the .pyi file
     # TODO: Generate it automatically by inspecing __init__
     _typing_static_ = []
     _typing_instance_ = [
+        ('SerialPort', 'ctypes.c_uint8'),
         ('RawAsciiData', 'bytes')
     ]
 
@@ -480,14 +461,8 @@ class XTFRawSerialHeader(ctypes.LittleEndianStructure):
             self.HeaderType = XTFHeaderType.raw_serial.value
             self.RawAsciiData = b''
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-
-class XTFPingChanHeader(ctypes.LittleEndianStructure):
+class XTFPingChanHeader(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('ChannelNumber', ctypes.c_uint16),
@@ -516,22 +491,10 @@ class XTFPingChanHeader(ctypes.LittleEndianStructure):
         ('ReservedSpace', ctypes.c_uint8 * 4)
     ]
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-
-class XTFPingHeader(ctypes.LittleEndianStructure):
+class XTFPingHeader(XTFPacket):
     _pack_ = 1
     _fields_ = [
-        ('MagicNumber', ctypes.c_uint16),
-        ('HeaderType', ctypes.c_uint8),
-        ('SubChannelNumber', ctypes.c_uint8),
-        ('NumChansToFollow', ctypes.c_uint16),
-        ('Reserved1', ctypes.c_uint16 * 2),
-        ('NumBytesThisRecord', ctypes.c_uint32),
         ('Year', ctypes.c_uint16),
         ('Month', ctypes.c_uint8),
         ('Day', ctypes.c_uint8),
@@ -616,7 +579,7 @@ class XTFPingHeader(ctypes.LittleEndianStructure):
     ]
 
     def __init__(self, buffer: IOBase = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         self.ping_chan_headers = []  # type: List[XTFPingChanHeader]
         self.data = []  # type: List[np.ndarray]
 
@@ -627,22 +590,10 @@ class XTFPingHeader(ctypes.LittleEndianStructure):
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.sonar.value
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-
-class XTFPosRawNavigation(ctypes.LittleEndianStructure):
+class XTFPosRawNavigation(XTFPacket):
     _pack_ = 1
     _fields_ = [
-        ('MagicNumber', ctypes.c_uint16),
-        ('HeaderType', ctypes.c_uint8),
-        ('SubChannelNumber', ctypes.c_uint8),
-        ('NumChansToFollow', ctypes.c_uint16),
-        ('Reserved1', ctypes.c_uint16 * 2),
-        ('NumBytesThisRecord', ctypes.c_uint32),  # Number of bytes without padding (header+data)
         ('Year', ctypes.c_uint16),
         ('Month', ctypes.c_uint8),
         ('Day', ctypes.c_uint8),
@@ -661,7 +612,7 @@ class XTFPosRawNavigation(ctypes.LittleEndianStructure):
     ]
 
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
@@ -669,22 +620,10 @@ class XTFPosRawNavigation(ctypes.LittleEndianStructure):
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.pos_raw_navigation.value
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-
-class XTFQPSSingleBeam(ctypes.LittleEndianStructure):
+class XTFQPSSingleBeam(XTFPacket):
     _pack_ = 1
     _fields_ = [
-        ('MagicNumber', ctypes.c_uint16),
-        ('HeaderType', ctypes.c_uint8),
-        ('SubChannelNumber', ctypes.c_uint8),
-        ('NumChansToFollow', ctypes.c_uint16),
-        ('Reserved1', ctypes.c_uint16 * 2),
-        ('NumBytesThisRecord', ctypes.c_uint32),  # Number of bytes without padding (header+data)
         ('TimeTag', ctypes.c_uint32),
         ('Id', ctypes.c_int32),
         ('SoundVelocity', ctypes.c_float),
@@ -702,7 +641,7 @@ class XTFQPSSingleBeam(ctypes.LittleEndianStructure):
     ]
 
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
@@ -710,13 +649,8 @@ class XTFQPSSingleBeam(ctypes.LittleEndianStructure):
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.q_singlebeam.value
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-class XTFQPSMultiTXEntry(ctypes.LittleEndianStructure):
+class XTFQPSMultiTXEntry(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('Id', ctypes.c_int),
@@ -730,13 +664,8 @@ class XTFQPSMultiTXEntry(ctypes.LittleEndianStructure):
         ('Reserved', ctypes.c_float * 4)
     ]
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-class XTFQPSMBEEntry(ctypes.LittleEndianStructure):
+class XTFQPSMBEEntry(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('Id', ctypes.c_int),
@@ -750,13 +679,8 @@ class XTFQPSMBEEntry(ctypes.LittleEndianStructure):
         ('Reserved', ctypes.c_float * 4)
     ]
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-class XTFRawCustomHeader(ctypes.LittleEndianStructure):
+class XTFRawCustomHeader(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('MagicNumber', ctypes.c_uint16),
@@ -782,7 +706,7 @@ class XTFRawCustomHeader(ctypes.LittleEndianStructure):
     ]
 
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
@@ -790,13 +714,8 @@ class XTFRawCustomHeader(ctypes.LittleEndianStructure):
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.custom_vendor_data.value
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-class XTFHeaderNavigation(ctypes.LittleEndianStructure):
+class XTFHeaderNavigation(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('MagicNumber', ctypes.c_uint16),
@@ -820,7 +739,7 @@ class XTFHeaderNavigation(ctypes.LittleEndianStructure):
     ]
 
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
@@ -828,13 +747,8 @@ class XTFHeaderNavigation(ctypes.LittleEndianStructure):
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.navigation.value
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-class XTFHeaderGyro(ctypes.LittleEndianStructure):
+class XTFHeaderGyro(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('MagicNumber', ctypes.c_uint16),
@@ -858,7 +772,7 @@ class XTFHeaderGyro(ctypes.LittleEndianStructure):
     ]
 
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
@@ -866,21 +780,10 @@ class XTFHeaderGyro(ctypes.LittleEndianStructure):
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.gyro.value
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-class XTFHighSpeedSensor(ctypes.LittleEndianStructure):
+class XTFHighSpeedSensor(XTFPacket):
     _pack_ = 1
     _fields_ = [
-        ('MagicNumber', ctypes.c_uint16),
-        ('HeaderType', ctypes.c_uint8),
-        ('SubChannelNumber', ctypes.c_uint8),
-        ('NumChansToFollow', ctypes.c_uint16),
-        ('Reserved1', ctypes.c_uint16 * 2),
-        ('NumBytesThisRecord', ctypes.c_uint32),
         ('Year', ctypes.c_uint16),
         ('Month', ctypes.c_uint8),
         ('Day', ctypes.c_uint8),
@@ -894,21 +797,12 @@ class XTFHighSpeedSensor(ctypes.LittleEndianStructure):
     ]
 
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if buffer:
-            if self.MagicNumber != 0xFACE:
-                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
-        else:
-            self.MagicNumber = 0xFACE
+        super().__init__(buffer, *args, **kwargs)
+        if not buffer:
             self.HeaderType = XTFHeaderType.highspeed_sensor2.value
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-class XTFBeamXYZA(ctypes.LittleEndianStructure):
+class XTFBeamXYZA(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('dPosOffsetTrX', ctypes.c_double),
@@ -920,16 +814,10 @@ class XTFBeamXYZA(ctypes.LittleEndianStructure):
     ]
 
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def __str__(self):
-        return ctype_struct_tostring(self)
-
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
+        super().__init__(buffer, *args, **kwargs)
 
 
-class SNP0(ctypes.LittleEndianStructure):
+class SNP0(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('ID', ctypes.c_uint32),                # Identifier code. SNP0= 0x534E5030
@@ -966,22 +854,16 @@ class SNP0(ctypes.LittleEndianStructure):
         ('BeamCnt', ctypes.c_uint16)            # Number of beams
     ]
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
-
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.ID != 0x534E5030:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
         else:
             self.ID = 0x534E5030
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
 
-
-class SNP1(ctypes.LittleEndianStructure):
+class SNP1(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('ID', ctypes.c_uint32),            # Identifier code. SNP1= 0x534E5031
@@ -996,19 +878,14 @@ class SNP1(ctypes.LittleEndianStructure):
         ('FragSamples', ctypes.c_uint16)    # Fragment size, samples
     ]
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
-
     def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.ID != 0x534E5031:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
         else:
             self.ID = 0x534E5031
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
 
 #endregion C-Types
 
@@ -1048,3 +925,5 @@ if __name__ == '__main__':
     for (xtf_header, n_bytes) in header_sizes:
         assert ctypes.sizeof(xtf_header) == n_bytes, \
             "{} expected size is {} bytes, was {} bytes".format(xtf_header.__name__, n_bytes, ctypes.sizeof(xtf_header))
+
+
