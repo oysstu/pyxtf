@@ -384,11 +384,7 @@ class XTFAttitudeData(XTFPacket):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(buffer, *args, **kwargs)
-        if buffer:
-            if self.MagicNumber != 0xFACE:
-                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
-        else:
-            self.MagicNumber = 0xFACE
+        if not buffer:
             self.HeaderType = XTFHeaderType.attitude
 
 
@@ -407,11 +403,7 @@ class XTFNotesHeader(XTFPacket):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(buffer, *args, **kwargs)
-        if buffer:
-            if self.MagicNumber != 0xFACE:
-                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
-        else:
-            self.MagicNumber = 0xFACE
+        if not buffer:
             self.HeaderType = XTFHeaderType.notes.value
 
 
@@ -451,13 +443,9 @@ class XTFRawSerialHeader(XTFPacket):
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if buffer:
-            if self.MagicNumber != 0xFACE:
-                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
-
             # TODO: Make getters/setters that updates StringSize when changed
             self.RawAsciiData = buffer.read(ctypes.sizeof(ctypes.c_char) * self.StringSize.value)
         else:
-            self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.raw_serial.value
             self.RawAsciiData = b''
 
@@ -583,11 +571,7 @@ class XTFPingHeader(XTFPacket):
         self.ping_chan_headers = []  # type: List[XTFPingChanHeader]
         self.data = []  # type: List[np.ndarray]
 
-        if buffer:
-            if self.MagicNumber != 0xFACE:
-                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
-        else:
-            self.MagicNumber = 0xFACE
+        if not buffer:
             self.HeaderType = XTFHeaderType.sonar.value
 
 
@@ -613,11 +597,7 @@ class XTFPosRawNavigation(XTFPacket):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(buffer, *args, **kwargs)
-        if buffer:
-            if self.MagicNumber != 0xFACE:
-                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
-        else:
-            self.MagicNumber = 0xFACE
+        if not buffer:
             self.HeaderType = XTFHeaderType.pos_raw_navigation.value
 
 
@@ -642,11 +622,7 @@ class XTFQPSSingleBeam(XTFPacket):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(buffer, *args, **kwargs)
-        if buffer:
-            if self.MagicNumber != 0xFACE:
-                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
-        else:
-            self.MagicNumber = 0xFACE
+        if not buffer:
             self.HeaderType = XTFHeaderType.q_singlebeam.value
 
 
