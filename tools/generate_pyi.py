@@ -20,12 +20,48 @@ class CField:
 
 """
 
+XTF_Base = """
+class XTFBase(ctypes.LittleEndianStructure):
+    \"\"\"
+    Base class for all XTF ctypes.Structure children.
+    Exposes basic utility like printing of fields and constructing class from a buffer.
+    \"\"\"
+    def __str__(self) -> str:
+        pass
+
+    def __new__(cls, buffer: IOBase = None):
+        pass
+
+    def __init__(self, buffer=None, *args, **kwargs):
+        pass
+
+"""
+
 
 def ctype_struct_generator(module):
-    for name, obj in inspect.getmembers(module):
-        if inspect.isclass(obj):
-            if hasattr(obj, "__bases__") and ctypes.Structure in obj.__bases__:
+    module_structs = inspect.getmembers(module, predicate=(
+        lambda x: (inspect.isclass(x) and ctypes.Structure in inspect.getmro(x))))
+
+    # Sort by the line number in which the class appears
+    module_structs.sort(key=lambda x: inspect.getsourcelines(x[1])[1])
+    for name, obj in module_structs:
+            if ctypes.Structure in inspect.getmro(obj) and hasattr(obj, '_fields_'):
                 yield obj
+
+
+def get_all_fields(obj):
+    cur_obj = obj
+    fields = []
+
+    base_fields = []
+    if obj.__bases__:
+        for base in obj.__bases__:
+            base_fields += get_all_fields(base)
+
+    if hasattr(cur_obj, '_fields_'):
+        return base_fields + getattr(cur_obj, '_fields_')
+    else:
+        return base_fields
 
 
 def generate_pyi(module):
@@ -39,17 +75,26 @@ def generate_pyi(module):
             'import ctypes\n',
             'import numpy as np\n',
             #'import {}\n'.format(module.__package__),
+            'from io import IOBase, BytesIO\n'
             'from typing import List, Tuple, Dict, Callable, Any\n\n\n'
         ])
 
-        # Write CField class
+        # Write CField and XTFBase classes
         f.write(XTF_CField)
+        f.write(XTF_Base)
 
         for struct in c_structs:
-            f.write('class {}({}):\n'.format(struct.__name__, 'ctypes.Structure'))
+            base_names = [type.__name__ for type in struct.__bases__]
+            f.write('class {}({}):\n'.format(struct.__name__, ','.join(base_names)))
+
+            # Retrieve _fields_ for this class
+            if hasattr(struct, '_fields_'):
+                fields = struct._fields_
+            else:
+                fields = []
 
             # Write static fields (ctypes.CField)
-            for name, type in struct._fields_:
+            for name, type in fields:
                 f.write(' ' * 4 + '{} = None  # type: CField\n'.format(name))
 
             if hasattr(struct, '_typing_static_'):
@@ -58,7 +103,7 @@ def generate_pyi(module):
 
             # Write instance (typed) fields
             f.write('\n' + ' '*4 + 'def __init__(self):\n')
-            for name, type in struct._fields_:
+            for name, type in fields:
                 # Handle arrays correctly by extracting the element type
                 if ctypes.Array in type.__bases__:
                     if type._type_ in ctype_struct_generator(module):
