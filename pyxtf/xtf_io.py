@@ -234,7 +234,7 @@ if __name__ == '__main__':
         # Transpose if the longest axis is vertical
         np_mb = np_mb if np_mb.shape[0] < np_mb.shape[1] else np_mb.T
         plt.figure()
-        plt.imshow(np_mb, cmap='gray')
+        plt.imshow(np_mb, cmap='hot')
 
     # Get sonar if present
     if XTFHeaderType.sonar in p:
