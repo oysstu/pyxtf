@@ -90,9 +90,6 @@ def xtf_read(path: str, verbose: bool = False) -> Tuple[XTFFileHeader, Dict[XTFH
             p_start = XTFPacketStart(buffer=f)
             f.seek(packet_start_loc)
 
-            if p_start.MagicNumber != 0xFACE:
-                raise RuntimeError('Packet header start not at expected position')
-
             if p_start.HeaderType == XTFHeaderType.sonar:
                 # Sonar must be handled specifically, as the data is structured uniquely (XTFPingChanHeaders + data)
                 p_header = XTFPingHeader(buffer=f)
