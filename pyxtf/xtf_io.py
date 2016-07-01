@@ -89,7 +89,7 @@ def xtf_read(path: str, verbose: bool = False) -> Tuple[XTFFileHeader, Dict[XTFH
             packet_start_loc = f.tell()
 
             # Read the first few shared packet bytes without advancing file pointer
-            p_start = XTFPacketStart(buffer=f)
+            p_start = XTFPacket(buffer=f)
             f.seek(packet_start_loc)
 
             if p_start.HeaderType == XTFHeaderType.sonar:
