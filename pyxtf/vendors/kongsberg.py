@@ -12,7 +12,7 @@ import ctypes
 from enum import IntEnum, unique
 from io import IOBase, BytesIO
 import numpy as np
-from pyxtf.xtf_ctypes import ctype_struct_tostring, ctype_new_from_buffer
+from pyxtf.xtf_ctypes import XTFBase
 import warnings
 
 
@@ -51,7 +51,7 @@ class KMDatagramType(IntEnum):
     pu_bist_result = 0x42
 
 
-class KMOutputDatagramHeader(ctypes.LittleEndianStructure):
+class KMOutputDatagramHeader(XTFBase):
     '''
     Common starting header for all EM output datagrams
     '''
@@ -65,14 +65,8 @@ class KMOutputDatagramHeader(ctypes.LittleEndianStructure):
         ('Time', ctypes.c_uint32)  # Time since midnight in milliseconds
     ]
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-
-class KMRawRangeAngle78_TX(ctypes.LittleEndianStructure):
+class KMRawRangeAngle78_TX(XTFBase):
     '''
     Structure that is repeated Ntx times in the KMRawRangeAngle78 class
     '''
@@ -89,14 +83,8 @@ class KMRawRangeAngle78_TX(ctypes.LittleEndianStructure):
         ('SignalBandwidth', ctypes.c_float)  # In Hz
     ]
 
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
-
-
-class KMRawRangeAngle78_RX(ctypes.LittleEndianStructure):
+class KMRawRangeAngle78_RX(XTFBase):
     '''
     Structure that is repeated Nrx times in the KMRawRangeAngle78 class
     '''
@@ -113,12 +101,6 @@ class KMRawRangeAngle78_RX(ctypes.LittleEndianStructure):
         ('CleaningInfo', ctypes.c_int8),  # Real time cleaning info
         ('Spare', ctypes.c_uint8)
     ]
-
-    def __str__(self):
-        return ctype_struct_tostring(self)
-
-    def __new__(cls, buffer: IOBase = None):
-        return ctype_new_from_buffer(cls, buffer)
 
     def has_valid_detection(self):
         return not bool(self.DetectionInfo & 0b10000000)
@@ -152,7 +134,7 @@ class KMRawRangeAngle78_RX(ctypes.LittleEndianStructure):
         return bool(self.DetectionInfo & 0x10)
 
 
-class KMRawRangeAngle78(ctypes.LittleEndianStructure):
+class KMRawRangeAngle78(XTFBase):
     _pack_ = 1
     _fields_ = [
         ('NumberOfBytes', ctypes.c_uint32),
@@ -182,9 +164,6 @@ class KMRawRangeAngle78(ctypes.LittleEndianStructure):
             self.StartID = 0x02
             self.DatagramType = KMDatagramType.raw_range_and_angle_78.value
             self.EndID = 0x03
-
-    def __str__(self):
-        return ctype_struct_tostring(self)
 
     def __new__(cls, buffer: IOBase = None):
         if buffer:
