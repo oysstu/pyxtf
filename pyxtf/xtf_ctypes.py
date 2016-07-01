@@ -333,7 +333,7 @@ class XTFFileHeader(ctypes.LittleEndianStructure):
 class XTFPacketStart(ctypes.LittleEndianStructure):
     """
     This is a structure representing the first few bytes in every XTF packet.
-    It can be used to treat the packets generically to some degree, for example by lo
+    It can be used to inspect the packet type before reading the whole header.
     """
     _pack_ = 1
     _fields_ = [
@@ -347,7 +347,10 @@ class XTFPacketStart(ctypes.LittleEndianStructure):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not buffer:
+        if buffer:
+            if self.MagicNumber != 0xFACE:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.user_defined
 
@@ -387,7 +390,10 @@ class XTFAttitudeData(ctypes.LittleEndianStructure):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not buffer:
+        if buffer:
+            if self.MagicNumber != 0xFACE:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.attitude
 
@@ -419,7 +425,10 @@ class XTFNotesHeader(ctypes.LittleEndianStructure):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not buffer:
+        if buffer:
+            if self.MagicNumber != 0xFACE:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.notes.value
 
@@ -461,6 +470,9 @@ class XTFRawSerialHeader(ctypes.LittleEndianStructure):
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if buffer:
+            if self.MagicNumber != 0xFACE:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+
             # TODO: Make getters/setters that updates StringSize when changed
             self.RawAsciiData = buffer.read(ctypes.sizeof(ctypes.c_char) * self.StringSize.value)
         else:
@@ -608,7 +620,10 @@ class XTFPingHeader(ctypes.LittleEndianStructure):
         self.ping_chan_headers = []  # type: List[XTFPingChanHeader]
         self.data = []  # type: List[np.ndarray]
 
-        if not buffer:
+        if buffer:
+            if self.MagicNumber != 0xFACE:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.sonar.value
 
@@ -647,7 +662,10 @@ class XTFPosRawNavigation(ctypes.LittleEndianStructure):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not buffer:
+        if buffer:
+            if self.MagicNumber != 0xFACE:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.pos_raw_navigation.value
 
@@ -685,7 +703,10 @@ class XTFQPSSingleBeam(ctypes.LittleEndianStructure):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not buffer:
+        if buffer:
+            if self.MagicNumber != 0xFACE:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.q_singlebeam.value
 
@@ -762,7 +783,10 @@ class XTFRawCustomHeader(ctypes.LittleEndianStructure):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not buffer:
+        if buffer:
+            if self.MagicNumber != 0xFACE:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.custom_vendor_data.value
 
@@ -797,7 +821,10 @@ class XTFHeaderNavigation(ctypes.LittleEndianStructure):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not buffer:
+        if buffer:
+            if self.MagicNumber != 0xFACE:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.navigation.value
 
@@ -832,7 +859,10 @@ class XTFHeaderGyro(ctypes.LittleEndianStructure):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not buffer:
+        if buffer:
+            if self.MagicNumber != 0xFACE:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.gyro.value
 
@@ -865,7 +895,10 @@ class XTFHighSpeedSensor(ctypes.LittleEndianStructure):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not buffer:
+        if buffer:
+            if self.MagicNumber != 0xFACE:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.highspeed_sensor2.value
 
@@ -938,7 +971,10 @@ class SNP0(ctypes.LittleEndianStructure):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not buffer:
+        if buffer:
+            if self.ID != 0x534E5030:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.ID = 0x534E5030
 
     def __new__(cls, buffer: IOBase = None):
@@ -965,7 +1001,10 @@ class SNP1(ctypes.LittleEndianStructure):
 
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not buffer:
+        if buffer:
+            if self.ID != 0x534E5031:
+                raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+        else:
             self.ID = 0x534E5031
 
     def __new__(cls, buffer: IOBase = None):
