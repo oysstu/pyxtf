@@ -1,9 +1,11 @@
-from pyxtf.xtf_ctypes import *
 import ctypes
-from io import BytesIO
-import numpy as np
-from typing import List, Tuple, Callable, Any, Dict
 import warnings
+from io import BytesIO
+from typing import List, Tuple, Callable, Any, Dict
+
+import numpy as np
+
+from pyxtf.xtf_ctypes import *
 
 # Output data type is set to an unsigned integer type of n bytes
 xtf_dtype = {
