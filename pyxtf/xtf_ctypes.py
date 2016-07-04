@@ -1,7 +1,11 @@
 import ctypes
+from datetime import date
 from enum import IntEnum, unique
 from io import IOBase, BytesIO
 from typing import List
+
+import numpy as np
+
 
 # General notes from the XTF format document (rev35)
 # 1. All structures should be zero-filled before use.
@@ -205,33 +209,9 @@ class XTFBase(ctypes.LittleEndianStructure):
     Base class for all XTF ctypes.Structure children.
     Exposes basic utility like printing of fields and constructing class from a buffer.
     """
-    def __str__(self):
-        """
-        Prints the fields in the class (with ctype-fields) in the order in which they appear in the structure.
-        """
-        fields = []
-        for field_name in dir(self):
-            if not field_name.startswith('_') and not field_name.endswith('_'):
-                field_value = getattr(self, field_name)
-                field_type = type(field_value)
+    def __init__(self, buffer=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-                if hasattr(self.__class__, field_name) and hasattr(getattr(self.__class__, field_name), 'offset'):
-                    offset = getattr(self.__class__, field_name).offset
-                else:
-                    offset = 2 ** 31
-
-                if ctypes.Array in field_type.__bases__ and field_type._type_ not in [ctypes.c_char, ctypes.c_wchar]:
-                    out_str = '{}: {}\n'.format(field_name, list(field_value))
-                else:
-                    out_str = '{}: {}\n'.format(field_name, field_value)
-
-                fields.append((offset, out_str))
-
-        # Sort by offset (non-ctypes placed last)
-        fields.sort(key=lambda x: x[0])
-        out = ''.join(field[1] for field in fields)
-
-        return out
 
     def __new__(cls, buffer: IOBase = None):
         if buffer:
@@ -248,8 +228,35 @@ class XTFBase(ctypes.LittleEndianStructure):
 
         return obj
 
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __str__(self):
+        """
+        Prints the fields in the class (with ctype-fields) in the order in which they appear in the structure.
+        """
+        fields = []
+        for field_name in dir(self):
+            if not field_name.startswith('_') and not field_name.endswith('_'):
+                field_value = getattr(self, field_name)
+                field_type = type(field_value)
+
+                # callable(obj) will return true for the fields, using 'method' name instead
+                if not field_type.__name__ == 'method':
+                    if hasattr(self.__class__, field_name) and hasattr(getattr(self.__class__, field_name), 'offset'):
+                        offset = getattr(self.__class__, field_name).offset
+                    else:
+                        offset = 2 ** 31
+
+                    if ctypes.Array in field_type.__bases__ and field_type._type_ not in [ctypes.c_char, ctypes.c_wchar]:
+                        out_str = '{}: {}\n'.format(field_name, list(field_value))
+                    else:
+                        out_str = '{}: {}\n'.format(field_name, field_value)
+
+                    fields.append((offset, out_str))
+
+        # Sort by offset (non-ctypes placed last)
+        fields.sort(key=lambda x: x[0])
+        out = ''.join(field[1] for field in fields)
+
+        return out
 
 
 class XTFChanInfo(XTFBase):
@@ -337,6 +344,55 @@ class XTFFileHeader(XTFBase):
 
 class XTFPacket(XTFBase):
     """
+    This is base class for all packets to derive from.
+    Some packets derive from the subclass XTFPacketStart instead, due to the common first fields present in many packets
+    """
+    _pack_ = 1
+    _fields_ = []
+
+    def get_time(self):
+        # All XTF packets has the fields Year, Month, Day, Hour, Minute, Second
+        # Some packets come with SourceEpoch (time since 1970-1-1) which is used if present
+        # The presence of high-resolution timers vary, and will be checked for (at runtime)
+
+        # Use epoch if available, else calculate from Year-Month-Day etc
+        if hasattr(self, 'SourceEpoch') and self.SourceEpoch:
+            p_time = np.datetime64(self.SourceEpoch, 's')
+
+            # XTFAttitudeData has an additional epoch field with microseconds
+            # Return immediately, as the high-precision fields added later doubles up
+            if hasattr(self, 'EpochMicroseconds') and self.EpochMicroseconds:
+                p_time += np.timedelta64(self.EpochMicroseconds, 'us')
+                return p_time
+        else:
+            # Numpy does not handle leap years and varying number of days per month
+            # Calculate the day from the python.datetime module
+            days = (date(self.Year, self.Month, self.Day) - date(self.Year, 1, 1)).days
+
+            # Calculate time using common fields
+            p_time = np.datetime64(str(self.Year), 'Y') + \
+                     np.timedelta64(days, 'D') + \
+                     np.timedelta64(self.Hour, 'h') + \
+                     np.timedelta64(self.Minute, 'm') + \
+                     np.timedelta64(self.Second, 's')
+
+            # Add time using high-res fields
+            if hasattr(self, 'HSeconds'):
+                return p_time + np.timedelta64(self.HSeconds*10, 'ms')  # HSeconds = hundredths of a second (0-99)
+
+            if hasattr(self, 'Millisecond'):
+                p_time += np.timedelta64(self.Millisecond, 'ms')
+
+            if hasattr(self, 'Microsecond'):
+                p_time += np.timedelta64(self.Microsecond, 'us')
+
+        #print(self.Year, self.Month, self.Day, self.Hour, self.Minute, self.Second, self.Millisecond)
+
+        return p_time
+
+
+class XTFPacketStart(XTFPacket):
+    """
     This is a structure representing the first few bytes in (most) of the XTF packets.
     It can be used to inspect the packet type before reading the whole header.
     """
@@ -360,7 +416,7 @@ class XTFPacket(XTFBase):
             self.HeaderType = XTFHeaderType.user_defined
 
 
-class XTFAttitudeData(XTFPacket):
+class XTFAttitudeData(XTFPacketStart):
     _pack_ = 1
     _fields_ = [
         ('Reserved2', ctypes.c_uint32 * 2),
@@ -388,7 +444,7 @@ class XTFAttitudeData(XTFPacket):
             self.HeaderType = XTFHeaderType.attitude
 
 
-class XTFNotesHeader(XTFPacket):
+class XTFNotesHeader(XTFPacketStart):
     _pack_ = 1
     _fields_ = [
         ('Year', ctypes.c_uint16),
@@ -407,7 +463,7 @@ class XTFNotesHeader(XTFPacket):
             self.HeaderType = XTFHeaderType.notes.value
 
 
-class XTFRawSerialHeader(XTFPacket):
+class XTFRawSerialHeader(XTFPacketStart):
     _pack_ = 1
     _fields_ = [
         ('Year', ctypes.c_uint16),
@@ -416,9 +472,9 @@ class XTFRawSerialHeader(XTFPacket):
         ('Hour', ctypes.c_uint8),
         ('Minute', ctypes.c_uint8),
         ('Second', ctypes.c_uint8),
-        ('HSeconds', ctypes.c_uint8),
+        ('HSeconds', ctypes.c_uint8),  # Hundredths of seconds (0-99)
         ('JulianDay', ctypes.c_uint16),
-        ('TimeTag', ctypes.c_uint32),
+        ('TimeTag', ctypes.c_uint32),  # Millisecond timer value
         ('StringSize', ctypes.c_uint16)  # After this, the number of ascii bytes follow
     ]
 
@@ -480,7 +536,7 @@ class XTFPingChanHeader(XTFBase):
     ]
 
 
-class XTFPingHeader(XTFPacket):
+class XTFPingHeader(XTFPacketStart):
     _pack_ = 1
     _fields_ = [
         ('Year', ctypes.c_uint16),
@@ -575,7 +631,7 @@ class XTFPingHeader(XTFPacket):
             self.HeaderType = XTFHeaderType.sonar.value
 
 
-class XTFPosRawNavigation(XTFPacket):
+class XTFPosRawNavigation(XTFPacketStart):
     _pack_ = 1
     _fields_ = [
         ('Year', ctypes.c_uint16),
@@ -584,7 +640,7 @@ class XTFPosRawNavigation(XTFPacket):
         ('Hour', ctypes.c_uint8),
         ('Minute', ctypes.c_uint8),
         ('Second', ctypes.c_uint8),
-        ('MicroSecond', ctypes.c_uint16),
+        ('Microsecond', ctypes.c_uint16),
         ('RawYcoordinate', ctypes.c_double),
         ('RawXcoordinate', ctypes.c_double),
         ('RawAltitude', ctypes.c_double),
@@ -601,7 +657,7 @@ class XTFPosRawNavigation(XTFPacket):
             self.HeaderType = XTFHeaderType.pos_raw_navigation.value
 
 
-class XTFQPSSingleBeam(XTFPacket):
+class XTFQPSSingleBeam(XTFPacketStart):
     _pack_ = 1
     _fields_ = [
         ('TimeTag', ctypes.c_uint32),
@@ -616,7 +672,7 @@ class XTFQPSSingleBeam(XTFPacket):
         ('Hour', ctypes.c_uint8),
         ('Minute', ctypes.c_uint8),
         ('Second', ctypes.c_uint8),
-        ('MilliSecond', ctypes.c_uint16),
+        ('Millisecond', ctypes.c_uint16),
         ('Reserved2', ctypes.c_uint8 * 7)
     ]
 
@@ -656,7 +712,7 @@ class XTFQPSMBEEntry(XTFBase):
     ]
 
 
-class XTFRawCustomHeader(XTFBase):
+class XTFRawCustomHeader(XTFPacket):
     _pack_ = 1
     _fields_ = [
         ('MagicNumber', ctypes.c_uint16),
@@ -677,7 +733,7 @@ class XTFRawCustomHeader(XTFBase):
         ('Hour', ctypes.c_uint8),
         ('Minute', ctypes.c_uint8),
         ('Second', ctypes.c_uint8),
-        ('MilliSecond', ctypes.c_uint16),
+        ('Millisecond', ctypes.c_uint16),
         ('Reserved2', ctypes.c_uint8 * 7)
     ]
 
@@ -691,7 +747,7 @@ class XTFRawCustomHeader(XTFBase):
             self.HeaderType = XTFHeaderType.custom_vendor_data.value
 
 
-class XTFHeaderNavigation(XTFBase):
+class XTFHeaderNavigation(XTFPacket):
     _pack_ = 1
     _fields_ = [
         ('MagicNumber', ctypes.c_uint16),
@@ -704,7 +760,7 @@ class XTFHeaderNavigation(XTFBase):
         ('Hour', ctypes.c_uint8),
         ('Minute', ctypes.c_uint8),
         ('Second', ctypes.c_uint8),
-        ('MicroSecond', ctypes.c_uint32),
+        ('Microsecond', ctypes.c_uint32),
         ('SourceEpoch', ctypes.c_uint32),
         ('TimeTag', ctypes.c_uint32),
         ('RawYcoordinate', ctypes.c_double),
@@ -724,7 +780,7 @@ class XTFHeaderNavigation(XTFBase):
             self.HeaderType = XTFHeaderType.navigation.value
 
 
-class XTFHeaderGyro(XTFBase):
+class XTFHeaderGyro(XTFPacket):
     _pack_ = 1
     _fields_ = [
         ('MagicNumber', ctypes.c_uint16),
@@ -737,14 +793,12 @@ class XTFHeaderGyro(XTFBase):
         ('Hour', ctypes.c_uint8),
         ('Minute', ctypes.c_uint8),
         ('Second', ctypes.c_uint8),
-        ('MicroSecond', ctypes.c_uint32),
+        ('Microsecond', ctypes.c_uint32),
         ('SourceEpoch', ctypes.c_uint32),
         ('TimeTag', ctypes.c_uint32),
-        ('RawYcoordinate', ctypes.c_double),
-        ('RawXcoordinate', ctypes.c_double),
-        ('RawAltitude', ctypes.c_double),
+        ('Gyro', ctypes.c_float),
         ('TimeFlag', ctypes.c_uint8),
-        ('Reserved2', ctypes.c_uint8 * 6)
+        ('Reserved1', ctypes.c_uint8 * 26)
     ]
 
     def __init__(self, buffer=None, *args, **kwargs):
@@ -757,7 +811,7 @@ class XTFHeaderGyro(XTFBase):
             self.HeaderType = XTFHeaderType.gyro.value
 
 
-class XTFHighSpeedSensor(XTFPacket):
+class XTFHighSpeedSensor(XTFPacketStart):
     _pack_ = 1
     _fields_ = [
         ('Year', ctypes.c_uint16),
@@ -895,6 +949,7 @@ if __name__ == '__main__':
         (XTFPingChanHeader, 64),
         (XTFHighSpeedSensor, 64),
         (XTFBeamXYZA, 31),
+        (XTFHeaderGyro, 64),
         (SNP0, 74),
         (SNP1, 24)
     ]
