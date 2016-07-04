@@ -1,5 +1,5 @@
 ### pyxtf
-A library for reading and visualizing the eXtended Triton Format (XTF) (revision 40)
+A library for reading eXtended Triton Format (XTF) files (revision 40)
 
 Current limitations:
  - Only supports python 3
