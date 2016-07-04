@@ -1,7 +1,7 @@
 import ctypes
 import warnings
 from io import BytesIO
-from typing import List, Tuple, Callable, Any, Dict
+from typing import List, Tuple, Callable, Any, Dict, Iterable
 
 import numpy as np
 
@@ -89,7 +89,7 @@ def xtf_read(path: str, verbose: bool = False) -> Tuple[XTFFileHeader, Dict[XTFH
             packet_start_loc = f.tell()
 
             # Read the first few shared packet bytes without advancing file pointer
-            p_start = XTFPacket(buffer=f)
+            p_start = XTFPacketStart(buffer=f)
             f.seek(packet_start_loc)
 
             if p_start.HeaderType == XTFHeaderType.sonar:
@@ -136,9 +136,11 @@ def xtf_read(path: str, verbose: bool = False) -> Tuple[XTFFileHeader, Dict[XTFH
 
                 if header_type == XTFHeaderType.bathy_xyza:
                     # Processed bathy data consists of repeated XTFBeamXYZA structures
-                    samples_iter = BytesIO(samples)
+                    # Note: Using a ctypes array is a _lot_ faster than constructing a list of BeamXYZA
                     num_xyza = n_bytes // ctypes.sizeof(XTFBeamXYZA)
-                    p_header.data = [XTFBeamXYZA(buffer=samples_iter) for _ in range(num_xyza)]
+                    xyza_array_type = XTFBeamXYZA * num_xyza
+                    xyza_array_type._pack_ = 1
+                    p_header.data = xyza_array_type.from_buffer_copy(samples)
                 else:
                     # Return raw bathy data as numpy array (NB: in list for consistency with sonar structure)
                     # The data is vendor specific, and therefore cannot be interpreted here
@@ -223,6 +225,8 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
     test_path = r'..\data\DemoFiles\Isis_Sonar_XTF\Reson7125.XTF'
+
+    # Read file header and packets
     (fh, p) = xtf_read(test_path, verbose=True)
 
     print('The following (supported) packets are present: \n\t' + str([key for key, v in p.items()]))
