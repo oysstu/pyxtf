@@ -102,7 +102,8 @@ def generate_pyi(module):
                     f.write(' ' * 4 + '{} = None  # type: {}\n'.format(name, type))
 
             # Write instance (typed) fields
-            f.write('\n' + ' '*4 + 'def __init__(self):\n')
+            if fields:
+                f.write('\n' + ' '*4 + 'def __init__(self):\n')
             for name, type in fields:
                 # Handle arrays correctly by extracting the element type
                 if ctypes.Array in type.__bases__:
