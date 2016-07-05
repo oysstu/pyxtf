@@ -5,14 +5,6 @@ from typing import Tuple, Callable, Any, Dict, Iterable
 from pyxtf.xtf_ctypes import *
 
 
-def flatten_iterable(l):
-    for el in l:
-        if isinstance(el, Iterable) and not isinstance(el, (str, bytes)):
-            for sub in flatten_iterable(el):
-                yield sub
-        else:
-            yield el
-
 def xtf_padding(size: int) -> int:
     """
     Calculates the necessary padding to make the XTF packet align on a 64byte multiple.
@@ -132,7 +124,7 @@ if __name__ == '__main__':
     test_path = r'..\data\DemoFiles\Isis_Sonar_XTF\Reson7125.XTF'
 
     # Read file header and packets
-    (fh, p) = xtf_read(test_path, verbose=False)
+    (fh, p) = xtf_read(test_path, verbose=True)
 
     print('The following (supported) packets are present (XTFHeaderType:count): \n\t' +
           str([key.name +':{}'.format(len(v)) for key, v in p.items()]))
