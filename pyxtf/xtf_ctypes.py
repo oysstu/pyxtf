@@ -28,6 +28,14 @@ Hex     - 0x0
 
 #region Enumerations
 
+# Mapping from number of bytes to the unsigned numpy type
+xtf_dtype = {
+    1: np.uint8,
+    2: np.uint16,
+    4: np.uint32,
+    8: np.uint64
+}
+
 class AutoIntEnum(IntEnum):
     """
     Enumeration that automatically increments subsequent elements.
@@ -212,7 +220,6 @@ class XTFBase(ctypes.LittleEndianStructure):
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-
     def __new__(cls, buffer: IOBase = None):
         if buffer:
             if type(buffer) in [bytes, bytearray]:
@@ -329,10 +336,44 @@ class XTFFileHeader(XTFBase):
         ('ChanInfo', XTFChanInfo * 6)
     ]
 
+    sonar_chan_types = [
+        XTFChannelType.port.value,
+        XTFChannelType.stbd.value,
+        XTFChannelType.subbottom.value]
+
+    def channel_count(self, verbose: bool = False) -> int:
+        """
+        Returns the number of separate channels present in the XTF file.
+        :param verbose: If true, the number of channels per channel type is printed.
+        :return: The total number of channels.
+        """
+        if verbose:
+            print('XTF Channels: sonar={}, bathy={}, snippet={}, forward={}, echo={}, interferometry={}'.format(
+                self.NumberOfSonarChannels,
+                self.NumberOfBathymetryChannels,
+                self.NumberOfSnippetChannels,
+                self.NumberOfForwardLookArrays,
+                self.NumberOfEchoStrengthChannels,
+                self.NumberOfInterferometryChannels)
+            )
+
+        n_channels = self.NumberOfSonarChannels \
+                   + self.NumberOfBathymetryChannels \
+                   + self.NumberOfSnippetChannels \
+                   + self.NumberOfForwardLookArrays \
+                   + self.NumberOfEchoStrengthChannels \
+                   + self.NumberOfInterferometryChannels
+
+        return n_channels
+
     def __init__(self, buffer=None, *args, **kwargs):
         super().__init__(buffer, *args, **kwargs)
 
-        if not buffer:
+        if buffer:
+            chan_info = [self.ChanInfo[i] for i in range(0, self.channel_count())]  # type: List[XTFChanInfo]
+            self.sonar_info = [x for x in chan_info if x.TypeOfChannel in XTFFileHeader.sonar_chan_types]
+            self.bathy_info = [x for x in chan_info if x.TypeOfChannel == XTFChannelType.bathy.value]
+        else:
             self.FileFormat = 0x7B
             self.SystemType = 1
             # Set ChanInfo[i].Reserved to 1024 for compatibility reasons (used to be NumSamples)
@@ -349,6 +390,12 @@ class XTFPacket(XTFBase):
     """
     _pack_ = 1
     _fields_ = []
+
+    def __new__(cls, buffer=None, file_header=None, *args, **kwargs):
+        return super().__new__(cls, buffer=buffer, *args, **kwargs)
+
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, *args, **kwargs)
 
     def get_time(self):
         # All XTF packets has the fields Year, Month, Day, Hour, Minute, Second
@@ -406,14 +453,17 @@ class XTFPacketStart(XTFPacket):
         ('NumBytesThisRecord', ctypes.c_uint32)
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(buffer, *args, **kwargs)
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
         else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.user_defined
+
+    def __new__(cls, buffer=None, file_header=None, *args, **kwargs):
+        return super().__new__(cls, buffer=buffer, file_header=file_header, *args, **kwargs)
 
 
 class XTFAttitudeData(XTFPacketStart):
@@ -438,8 +488,8 @@ class XTFAttitudeData(XTFPacketStart):
         ('Reserved3', ctypes.c_uint8)
         ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(buffer, *args, **kwargs)
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if not buffer:
             self.HeaderType = XTFHeaderType.attitude
 
@@ -457,8 +507,8 @@ class XTFNotesHeader(XTFPacketStart):
         ('NotesText', ctypes.c_char * 200)
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(buffer, *args, **kwargs)
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if not buffer:
             self.HeaderType = XTFHeaderType.notes.value
 
@@ -496,8 +546,8 @@ class XTFRawSerialHeader(XTFPacketStart):
         ('RawAsciiData', 'bytes')
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if buffer:
             # TODO: Make getters/setters that updates StringSize when changed
             self.RawAsciiData = buffer.read(ctypes.sizeof(ctypes.c_char) * self.StringSize.value)
@@ -622,10 +672,78 @@ class XTFPingHeader(XTFPacketStart):
         ('data', 'List[np.ndarray]')
     ]
 
-    def __init__(self, buffer: IOBase = None, *args, **kwargs):
-        super().__init__(buffer, *args, **kwargs)
-        self.ping_chan_headers = []  # type: List[XTFPingChanHeader]
-        self.data = []  # type: List[np.ndarray]
+    _bathy_header_types = [
+            XTFHeaderType.bathy_xyza.value,
+            XTFHeaderType.bathy.value,
+            XTFHeaderType.multibeam_raw_beam_angle
+        ]
+
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None):
+        p_header = super().__new__(cls, buffer=buffer, file_header=file_header)
+
+        p_header.ping_chan_headers = []  # type: List[XTFPingChanHeader]
+        p_header.data = []  # type: List[np.ndarray]
+
+        if buffer:
+            if not file_header:
+                raise RuntimeError('Initialization of XTFPingHeader from buffer requires file_header to be passed.')
+
+            # Sonar and bathy has a different data structure following the header
+            if p_header.HeaderType == XTFHeaderType.sonar:
+                for i in range(0, p_header.NumChansToFollow):
+                    # Retrieve XTFPingChanHeader for this channel
+                    p_chan = XTFPingChanHeader(buffer=buffer)
+                    p_header.ping_chan_headers.append(p_chan)
+
+                    # Backwards-compatibility: retrive from NumSamples if possible, else use old field
+                    n_samples = p_chan.NumSamples if p_chan.NumSamples > 0 else file_header.sonar_info[i].Reserved
+
+                    # Calculate number of bytes to read
+                    n_bytes = n_samples * file_header.sonar_info[i].BytesPerSample
+                    n_bytes_remaining = p_header.NumBytesThisRecord - \
+                                        ctypes.sizeof(XTFPingHeader) - \
+                                        ctypes.sizeof(XTFPingChanHeader)
+                    if n_bytes > n_bytes_remaining:
+                        raise RuntimeError('Number of bytes to read exceeds the number of bytes remaining in packet.')
+
+                    # Read the data and output as a numpy array of the specified bytes-per-sample
+                    samples = buffer.read(n_samples * file_header.sonar_info[i].BytesPerSample)
+                    if not samples:
+                        raise RuntimeError('File ended while reading data packets (file corrupt?)')
+                    samples = np.frombuffer(samples, dtype=xtf_dtype[file_header.sonar_info[i].BytesPerSample])
+                    p_header.data.append(samples)
+
+            elif p_header.HeaderType in cls._bathy_header_types:
+                # Bathymetry uses the same header as sonar, but without the XTFPingChanHeaders
+
+                # TODO: Should the sub-channel number be used to index chan_info (?)
+                #sub_chan = p_header.SubChannelNumber
+
+                # Read the data that follows
+                n_bytes = p_header.NumBytesThisRecord - ctypes.sizeof(XTFPingHeader)
+                samples = buffer.read(n_bytes)
+                if not samples:
+                    raise Exception('XTF data packets missing (file corrupt?)')
+
+                if p_header.HeaderType == XTFHeaderType.bathy_xyza:
+                    # Processed bathy data consists of repeated XTFBeamXYZA structures
+                    # Note: Using a ctypes array is a _lot_ faster than constructing a list of BeamXYZA
+                    num_xyza = n_bytes // ctypes.sizeof(XTFBeamXYZA)
+                    xyza_array_type = XTFBeamXYZA * num_xyza
+                    xyza_array_type._pack_ = 1
+                    p_header.data = xyza_array_type.from_buffer_copy(samples)
+                else:
+                    # Return raw bathy data as numpy array (NB: in list for consistency with sonar structure)
+                    # The data is vendor specific, and therefore cannot be interpreted here
+                    p_header.data = [np.frombuffer(samples, dtype=np.uint8)]
+            else:
+                raise RuntimeError('Unknown XTFPingHeader type encountered.')
+
+        return p_header
+
+
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
 
         if not buffer:
             self.HeaderType = XTFHeaderType.sonar.value
@@ -651,8 +769,8 @@ class XTFPosRawNavigation(XTFPacketStart):
         ('Reserved2', ctypes.c_uint8)
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(buffer, *args, **kwargs)
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if not buffer:
             self.HeaderType = XTFHeaderType.pos_raw_navigation.value
 
@@ -676,8 +794,8 @@ class XTFQPSSingleBeam(XTFPacketStart):
         ('Reserved2', ctypes.c_uint8 * 7)
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(buffer, *args, **kwargs)
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if not buffer:
             self.HeaderType = XTFHeaderType.q_singlebeam.value
 
@@ -737,8 +855,8 @@ class XTFRawCustomHeader(XTFPacket):
         ('Reserved2', ctypes.c_uint8 * 7)
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(buffer, *args, **kwargs)
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
@@ -770,8 +888,8 @@ class XTFHeaderNavigation(XTFPacket):
         ('Reserved2', ctypes.c_uint8 * 6)
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(buffer, *args, **kwargs)
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
@@ -801,8 +919,8 @@ class XTFHeaderGyro(XTFPacket):
         ('Reserved1', ctypes.c_uint8 * 26)
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(buffer, *args, **kwargs)
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
                 raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
@@ -826,8 +944,8 @@ class XTFHighSpeedSensor(XTFPacketStart):
         ('Reserved3', ctypes.c_uint8 * 34)
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(buffer, *args, **kwargs)
+    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if not buffer:
             self.HeaderType = XTFHeaderType.highspeed_sensor2.value
 
@@ -924,6 +1042,8 @@ class SNP1(XTFBase):
 # TODO: XTF Bathy snippets (SNP0/SNP1 etc) requires a custom implementation in xtf_read
 XTFPacketClasses = {
     XTFHeaderType.sonar: XTFPingHeader,
+    XTFHeaderType.bathy: XTFPingHeader,
+    XTFHeaderType.bathy_xyza: XTFPingHeader,
     XTFHeaderType.attitude: XTFAttitudeData,
     XTFHeaderType.notes: XTFNotesHeader,
     XTFHeaderType.raw_serial: XTFRawSerialHeader,

@@ -1,20 +1,17 @@
-import ctypes
 import warnings
-from io import BytesIO
-from typing import List, Tuple, Callable, Any, Dict, Iterable
-
-import numpy as np
+from collections import Iterable
+from typing import Tuple, Callable, Any, Dict, Iterable
 
 from pyxtf.xtf_ctypes import *
 
-# Output data type is set to an unsigned integer type of n bytes
-xtf_dtype = {
-    1: np.uint8,
-    2: np.uint16,
-    4: np.uint32,
-    8: np.uint64
-}
 
+def flatten_iterable(l):
+    for el in l:
+        if isinstance(el, Iterable) and not isinstance(el, (str, bytes)):
+            for sub in flatten_iterable(el):
+                yield sub
+        else:
+            yield el
 
 def xtf_padding(size: int) -> int:
     """
@@ -26,52 +23,17 @@ def xtf_padding(size: int) -> int:
     return ((size + 63) // 64) * 64
 
 
-def channel_count(file_header: XTFFileHeader, verbose: bool = False) -> int:
-    """
-    Returns the number of separate channels present in the XTF file.
-    :param file_header: The file header of the XTF file.
-    :param verbose: If true, the number of channels per channel type is printed.
-    :return: The total number of channels.
-    """
-    if verbose:
-        print('XTF Channels: sonar={}, bathy={}, snippet={}, forward={}, echo={}, interferometry={}'.format(
-            file_header.NumberOfSonarChannels,
-            file_header.NumberOfBathymetryChannels,
-            file_header.NumberOfSnippetChannels,
-            file_header.NumberOfForwardLookArrays,
-            file_header.NumberOfEchoStrengthChannels,
-            file_header.NumberOfInterferometryChannels)
-        )
-
-    n_channels = file_header.NumberOfSonarChannels \
-                 + file_header.NumberOfBathymetryChannels \
-                 + file_header.NumberOfSnippetChannels \
-                 + file_header.NumberOfForwardLookArrays \
-                 + file_header.NumberOfEchoStrengthChannels \
-                 + file_header.NumberOfInterferometryChannels
-
-    return n_channels
-
-
 def xtf_read(path: str, verbose: bool = False) -> Tuple[XTFFileHeader, Dict[XTFHeaderType, List[Any]]]:
     with open(path, 'rb') as f:
         # Read initial file header
         file_header = XTFFileHeader(buffer=f)
 
-        n_channels = channel_count(file_header, verbose)
+        n_channels = file_header.channel_count(verbose)
         if n_channels > 6:
             raise NotImplementedError("Support for more than 6 channels not implemented.")
 
         # Channel info
         chan_info = [file_header.ChanInfo[i] for i in range(0, n_channels)]  #type: List[XTFChanInfo]
-
-        # Divide into sonar/bathy subchannels
-        sonar_chan_types = [
-            XTFChannelType.port.value,
-            XTFChannelType.stbd.value,
-            XTFChannelType.subbottom.value]
-        sonar_info = [x for x in chan_info if x.TypeOfChannel in sonar_chan_types]
-        bathy_info = [x for x in chan_info if x.TypeOfChannel == XTFChannelType.bathy.value]
 
         # Loop through XTF packets and handle according to type
         packets = {}  # type: Dict[XTFHeaderType, List[Any]]
@@ -89,81 +51,24 @@ def xtf_read(path: str, verbose: bool = False) -> Tuple[XTFFileHeader, Dict[XTFH
             packet_start_loc = f.tell()
 
             # Read the first few shared packet bytes without advancing file pointer
-            p_start = XTFPacketStart(buffer=f)
+            p_start = XTFPacketStart(buffer=f, file_header=file_header)
             f.seek(packet_start_loc)
 
-            if p_start.HeaderType == XTFHeaderType.sonar:
-                # Sonar must be handled specifically, as the data is structured uniquely (XTFPingChanHeaders + data)
-                p_header = XTFPingHeader(buffer=f)
+            # Get the class assosciated with this header type (if any)
+            # How to read and construct each type is implemented in the class (default impl. in XTFBase.__new__)
+            p_headertype = XTFHeaderType(p_start.HeaderType)
 
-                for i in range(0, p_header.NumChansToFollow):
-                    p_chan = XTFPingChanHeader(buffer=f)
-                    p_header.ping_chan_headers.append(p_chan)
-                    n_samples = p_chan.NumSamples if p_chan.NumSamples > 0 else sonar_info[i].Reserved
+            p_class = XTFPacketClasses.get(p_headertype, None)
 
-                    n_bytes = n_samples * sonar_info[i].BytesPerSample
-                    n_bytes_remaining = p_header.NumBytesThisRecord - \
-                                        ctypes.sizeof(XTFPingHeader) - \
-                                        ctypes.sizeof(XTFPingChanHeader)
-                    if n_bytes > n_bytes_remaining:
-                        raise RuntimeError('Number of bytes to read exceeds the number of bytes remaining in packet.')
-
-                    # Read the data that follows
-                    samples = f.read(n_samples * sonar_info[i].BytesPerSample)
-                    if not samples:
-                        raise Exception('File ended while reading data packets (file corrupt?)')
-                    samples = np.frombuffer(samples, dtype=xtf_dtype[sonar_info[i].BytesPerSample])
-                    p_header.data.append(samples)
-
+            if p_class:
+                p_header = p_class(buffer=f, file_header=file_header)
                 try:
-                    packets[XTFHeaderType.sonar].append(p_header)
+                    packets[p_headertype].append(p_header)
                 except KeyError:
-                    packets[XTFHeaderType.sonar] = [p_header]
-
-            elif p_start.HeaderType in bathy_header_types:
-                # Bathymetry uses the same header as sonar, but without the XTFPingChanHeaders
-
-                p_header = XTFPingHeader(buffer=f)
-                # Note: Operating under the assumption that the sub-channel number controls the chan_info index
-                sub_chan = p_header.SubChannelNumber
-                header_type = XTFHeaderType(p_start.HeaderType)
-
-                # Read the data that follows
-                n_bytes = p_header.NumBytesThisRecord - ctypes.sizeof(XTFPingHeader)
-                samples = f.read(n_bytes)
-                if not samples:
-                    raise Exception('XTF data packets missing (file corrupt?)')
-
-                if header_type == XTFHeaderType.bathy_xyza:
-                    # Processed bathy data consists of repeated XTFBeamXYZA structures
-                    # Note: Using a ctypes array is a _lot_ faster than constructing a list of BeamXYZA
-                    num_xyza = n_bytes // ctypes.sizeof(XTFBeamXYZA)
-                    xyza_array_type = XTFBeamXYZA * num_xyza
-                    xyza_array_type._pack_ = 1
-                    p_header.data = xyza_array_type.from_buffer_copy(samples)
-                else:
-                    # Return raw bathy data as numpy array (NB: in list for consistency with sonar structure)
-                    # The data is vendor specific, and therefore cannot be interpreted here
-                    p_header.data = [np.frombuffer(samples, dtype=np.uint8)]
-                try:
-                    packets[header_type].append(p_header)
-                except KeyError:
-                    packets[header_type] = [p_header]
-
+                    packets[p_headertype] = [p_header]
             else:
-                # Generic header-type (no data following the header)
-                p_headertype = XTFHeaderType(p_start.HeaderType)
-                p_class = XTFPacketClasses.get(p_headertype, None)
-
-                if p_class:
-                    p_header = p_class(buffer=f)
-                    try:
-                        packets[p_headertype].append(p_header)
-                    except KeyError:
-                        packets[p_headertype] = [p_header]
-                else:
-                    warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
-                    warnings.warn(warning_str)
+                warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
+                warnings.warn(warning_str)
 
             # Skip over any data padding before next iteration
             f.seek(packet_start_loc + p_start.NumBytesThisRecord)
@@ -227,9 +132,10 @@ if __name__ == '__main__':
     test_path = r'..\data\DemoFiles\Isis_Sonar_XTF\Reson7125.XTF'
 
     # Read file header and packets
-    (fh, p) = xtf_read(test_path, verbose=True)
+    (fh, p) = xtf_read(test_path, verbose=False)
 
-    print('The following (supported) packets are present: \n\t' + str([key for key, v in p.items()]))
+    print('The following (supported) packets are present (XTFHeaderType:count): \n\t' +
+          str([key.name +':{}'.format(len(v)) for key, v in p.items()]))
 
     # Get multibeam (xyza) if present
     if XTFHeaderType.bathy_xyza in p:
