@@ -217,8 +217,6 @@ class XTFBase(ctypes.LittleEndianStructure):
     Base class for all XTF ctypes.Structure children.
     Exposes basic utility like printing of fields and constructing class from a buffer.
     """
-    def __init__(self, buffer=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
     def __new__(cls, buffer: IOBase = None):
         if buffer:
@@ -231,9 +229,12 @@ class XTFBase(ctypes.LittleEndianStructure):
 
             obj = cls.from_buffer_copy(header_bytes)
         else:
-            obj = ctypes.LittleEndianStructure.__new__(cls)
+            obj = super().__new__(cls)
 
         return obj
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def __str__(self):
         """
@@ -291,7 +292,10 @@ class XTFChanInfo(XTFBase):
         ('ReservedArea2', ctypes.c_uint8 * 54)
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None):
+        return super().__new__(cls, buffer=buffer)
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
         super().__init__(buffer, *args, **kwargs)
         if not buffer:
             self.Reserved = 1024  # For compatibility reasons with old viewers
@@ -366,7 +370,10 @@ class XTFFileHeader(XTFBase):
 
         return n_channels
 
-    def __init__(self, buffer=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None):
+        return super().__new__(cls, buffer=buffer)
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
         super().__init__(buffer, *args, **kwargs)
 
         if buffer:
@@ -391,10 +398,10 @@ class XTFPacket(XTFBase):
     _pack_ = 1
     _fields_ = []
 
-    def __new__(cls, buffer=None, file_header=None, *args, **kwargs):
-        return super().__new__(cls, buffer=buffer, *args, **kwargs)
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None):
+        return super().__new__(cls, buffer=buffer)
 
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
         super().__init__(buffer=buffer, *args, **kwargs)
 
     def get_time(self):
@@ -453,7 +460,10 @@ class XTFPacketStart(XTFPacket):
         ('NumBytesThisRecord', ctypes.c_uint32)
     ]
 
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None):
+        return super().__new__(cls, buffer=buffer, file_header=file_header)
+
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
         super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
@@ -461,9 +471,6 @@ class XTFPacketStart(XTFPacket):
         else:
             self.MagicNumber = 0xFACE
             self.HeaderType = XTFHeaderType.user_defined
-
-    def __new__(cls, buffer=None, file_header=None, *args, **kwargs):
-        return super().__new__(cls, buffer=buffer, file_header=file_header, *args, **kwargs)
 
 
 class XTFAttitudeData(XTFPacketStart):
@@ -488,7 +495,10 @@ class XTFAttitudeData(XTFPacketStart):
         ('Reserved3', ctypes.c_uint8)
         ]
 
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None):
+        return super().__new__(cls, buffer=buffer, file_header=file_header)
+
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
         super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if not buffer:
             self.HeaderType = XTFHeaderType.attitude
@@ -507,7 +517,10 @@ class XTFNotesHeader(XTFPacketStart):
         ('NotesText', ctypes.c_char * 200)
     ]
 
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None):
+        return super().__new__(cls, buffer=buffer, file_header=file_header)
+
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
         super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if not buffer:
             self.HeaderType = XTFHeaderType.notes.value
@@ -528,6 +541,20 @@ class XTFRawSerialHeader(XTFPacketStart):
         ('StringSize', ctypes.c_uint16)  # After this, the number of ascii bytes follow
     ]
 
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
+        obj = super().__new__(cls, buffer=buffer, file_header=file_header, *args, **kwargs)
+
+        if buffer:
+            # TODO: Make getters/setters that updates StringSize when changed
+            obj.RawAsciiData = buffer.read(ctypes.sizeof(ctypes.c_char) * obj.StringSize.value)
+        else:
+            obj.RawAsciiData = b''
+
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
+        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
+        if not buffer:
+            self.HeaderType = XTFHeaderType.raw_serial.value
+
     # Serialport and subchannelnumber is the same variable
     # The documentation uses serialport, so this redirection is added to match the docs
     @property
@@ -546,14 +573,7 @@ class XTFRawSerialHeader(XTFPacketStart):
         ('RawAsciiData', 'bytes')
     ]
 
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
-        super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
-        if buffer:
-            # TODO: Make getters/setters that updates StringSize when changed
-            self.RawAsciiData = buffer.read(ctypes.sizeof(ctypes.c_char) * self.StringSize.value)
-        else:
-            self.HeaderType = XTFHeaderType.raw_serial.value
-            self.RawAsciiData = b''
+
 
 
 class XTFPingChanHeader(XTFBase):
@@ -584,6 +604,12 @@ class XTFPingChanHeader(XTFBase):
         ('Weight', ctypes.c_int16),
         ('ReservedSpace', ctypes.c_uint8 * 4)
     ]
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
+        super().__init__(buffer=buffer, *args, **kwargs)
+
+    def __new__(cls, buffer: IOBase = None):
+        return super().__new__(cls, buffer=buffer)
 
 
 class XTFPingHeader(XTFPacketStart):
@@ -741,8 +767,7 @@ class XTFPingHeader(XTFPacketStart):
 
         return p_header
 
-
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
         super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
 
         if not buffer:
@@ -769,7 +794,10 @@ class XTFPosRawNavigation(XTFPacketStart):
         ('Reserved2', ctypes.c_uint8)
     ]
 
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None):
+        return super().__new__(cls, buffer=buffer, file_header=file_header)
+
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
         super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if not buffer:
             self.HeaderType = XTFHeaderType.pos_raw_navigation.value
@@ -794,7 +822,10 @@ class XTFQPSSingleBeam(XTFPacketStart):
         ('Reserved2', ctypes.c_uint8 * 7)
     ]
 
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None):
+        return super().__new__(cls, buffer=buffer, file_header=file_header)
+
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
         super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if not buffer:
             self.HeaderType = XTFHeaderType.q_singlebeam.value
@@ -814,6 +845,12 @@ class XTFQPSMultiTXEntry(XTFBase):
         ('Reserved', ctypes.c_float * 4)
     ]
 
+    def __new__(cls, buffer: IOBase = None):
+        return super().__new__(cls, buffer=buffer)
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
+        super().__init__(buffer=buffer, *args, **kwargs)
+
 
 class XTFQPSMBEEntry(XTFBase):
     _pack_ = 1
@@ -828,6 +865,12 @@ class XTFQPSMBEEntry(XTFBase):
         ('OffsetZ', ctypes.c_double),
         ('Reserved', ctypes.c_float * 4)
     ]
+
+    def __new__(cls, buffer: IOBase = None):
+        return super().__new__(cls, buffer=buffer)
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
+        super().__init__(buffer=buffer, *args, **kwargs)
 
 
 class XTFRawCustomHeader(XTFPacket):
@@ -855,7 +898,10 @@ class XTFRawCustomHeader(XTFPacket):
         ('Reserved2', ctypes.c_uint8 * 7)
     ]
 
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None):
+        return super().__new__(cls, buffer=buffer, file_header=file_header)
+
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
         super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
@@ -888,7 +934,10 @@ class XTFHeaderNavigation(XTFPacket):
         ('Reserved2', ctypes.c_uint8 * 6)
     ]
 
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None):
+        return super().__new__(cls, buffer=buffer, file_header=file_header)
+
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
         super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
@@ -919,7 +968,10 @@ class XTFHeaderGyro(XTFPacket):
         ('Reserved1', ctypes.c_uint8 * 26)
     ]
 
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None):
+        return super().__new__(cls, buffer=buffer, file_header=file_header)
+
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
         super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if buffer:
             if self.MagicNumber != 0xFACE:
@@ -944,7 +996,10 @@ class XTFHighSpeedSensor(XTFPacketStart):
         ('Reserved3', ctypes.c_uint8 * 34)
     ]
 
-    def __init__(self, buffer=None, file_header=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None, file_header: XTFFileHeader = None):
+        return super().__new__(cls, buffer=buffer, file_header=file_header)
+
+    def __init__(self, buffer: IOBase = None, file_header: XTFFileHeader = None, *args, **kwargs):
         super().__init__(buffer=buffer, file_header=file_header, *args, **kwargs)
         if not buffer:
             self.HeaderType = XTFHeaderType.highspeed_sensor2.value
@@ -961,7 +1016,10 @@ class XTFBeamXYZA(XTFBase):
         ('ucQuality', ctypes.c_uint8)
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None):
+        return super().__new__(cls, buffer=buffer)
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
         super().__init__(buffer, *args, **kwargs)
 
 
@@ -1002,7 +1060,10 @@ class SNP0(XTFBase):
         ('BeamCnt', ctypes.c_uint16)            # Number of beams
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None):
+        return super().__new__(cls, buffer=buffer)
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
         super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.ID != 0x534E5030:
@@ -1026,7 +1087,10 @@ class SNP1(XTFBase):
         ('FragSamples', ctypes.c_uint16)    # Fragment size, samples
     ]
 
-    def __init__(self, buffer=None, *args, **kwargs):
+    def __new__(cls, buffer: IOBase = None):
+        return super().__new__(cls, buffer=buffer)
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
         super().__init__(buffer, *args, **kwargs)
         if buffer:
             if self.ID != 0x534E5031:
