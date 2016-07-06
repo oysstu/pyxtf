@@ -65,6 +65,12 @@ class KMOutputDatagramHeader(XTFBase):
         ('Time', ctypes.c_uint32)  # Time since midnight in milliseconds
     ]
 
+    def __new__(cls, buffer: IOBase = None):
+        return super().__new__(cls, buffer=buffer)
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
+        super().__init__(buffer=buffer, *args, **kwargs)
+
 
 class KMRawRangeAngle78_TX(XTFBase):
     '''
@@ -82,6 +88,12 @@ class KMRawRangeAngle78_TX(XTFBase):
         ('SectorNumber', ctypes.c_uint8),  # Transmit sector number / TX array index
         ('SignalBandwidth', ctypes.c_float)  # In Hz
     ]
+
+    def __new__(cls, buffer: IOBase = None):
+        return super().__new__(cls, buffer=buffer)
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
+        super().__init__(buffer=buffer, *args, **kwargs)
 
 
 class KMRawRangeAngle78_RX(XTFBase):
@@ -101,6 +113,12 @@ class KMRawRangeAngle78_RX(XTFBase):
         ('CleaningInfo', ctypes.c_int8),  # Real time cleaning info
         ('Spare', ctypes.c_uint8)
     ]
+
+    def __new__(cls, buffer: IOBase = None):
+        return super().__new__(cls, buffer=buffer)
+
+    def __init__(self, buffer: IOBase = None, *args, **kwargs):
+        super().__init__(buffer=buffer, *args, **kwargs)
 
     def has_valid_detection(self):
         return not bool(self.DetectionInfo & 0b10000000)
@@ -213,7 +231,8 @@ if __name__ == '__main__':
     test_path = r'..\..\data\Survey\27apr\EM2040\em2040-0007-l02-20160427-124929_RAW.xtf'
     (fh, p) = xtf_read(test_path)
 
-    data1 = p[XTFHeaderType.multibeam_raw_beam_angle][0].data[0].tobytes()
-    d1 = KMRawRangeAngle78(data1)
-    print(d1)
+    if XTFHeaderType.multibeam_raw_beam_angle in p:
+        data1 = p[XTFHeaderType.multibeam_raw_beam_angle][0].data[0].tobytes()
+        d1 = KMRawRangeAngle78(data1)
+        print(d1)
 
