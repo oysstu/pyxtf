@@ -34,6 +34,9 @@ def xtf_read(path: str, verbose: bool = False) -> Tuple[XTFFileHeader, Dict[XTFH
             XTFHeaderType.bathy.value,
             XTFHeaderType.multibeam_raw_beam_angle
         ]
+
+        # Preallocate, as they are assigned to at every iteration
+        p_start = XTFPacketStart()
         while True:
             # Test for file end without advancing the file position
             if not f.peek(1):
@@ -43,7 +46,9 @@ def xtf_read(path: str, verbose: bool = False) -> Tuple[XTFFileHeader, Dict[XTFH
             packet_start_loc = f.tell()
 
             # Read the first few shared packet bytes without advancing file pointer
-            p_start = XTFPacketStart(buffer=f, file_header=file_header)
+            bytes_read = f.readinto(p_start)
+            if bytes_read < ctypes.sizeof(XTFPacketStart):
+                raise RuntimeError('XTF file shorter than expected (end hit while reading {})'.format(cls.__name__))
             f.seek(packet_start_loc)
 
             # Get the class assosciated with this header type (if any)
@@ -79,6 +84,25 @@ def xtf_peek(path: str, properties: List[Callable[[ctypes.Structure], Any]] = No
     # NOTE: This should be done through the property offsets to avoid having to construct the c-structure completely
     raise NotImplementedError('xtf_peek is not implemented yet')
 
+
+def xtf_selective_read(path: str, packet_types: List[XTFPacket]):
+    """
+    Selectively reads the packet types listed.
+    :param path:
+    :param packet_types:
+    :return:
+    """
+    pass
+
+
+def xtf_generate_index(path: str):
+    """
+    Generates an index file over the packets present in the xtf file to speed up selective reading / peeking.
+    The index is stored in a dictionary, which is pickeled to a file with an .pyxtf extension.
+    :param path: The path to the XTF file.
+    :return: None
+    """
+    pass
 
 def concatenate_channel(pings: List[XTFPingHeader], chan_info: XTFChanInfo, channel: int) -> np.ndarray:
     """
