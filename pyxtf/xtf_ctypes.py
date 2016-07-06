@@ -95,8 +95,8 @@ class XTFHeaderType(IntEnum):
     navigation = 42                     # Source time-stamped navigation data, holds updates of any nav data
     time = 50
     benthos_caati_sara = 60             # Custom Benthos data
-    header_7125 = 61                    # 7125 bathy data
-    header_7125_snippet = 62            # 7125 Bathy data snippets
+    reson_7125 = 61                    # 7125 bathy data
+    reson_7125_snippet = 62            # 7125 Bathy data snippets
     qinsy_r2sonic_bathy = 65            # QINSy R2Sonic bathy data
     qinsy_r2sonic_fts = 66              # QINSy R2Sonic bathy footprint time series (snippets)
     r2sonic_bathy = 68                  # Triton R2Sonic bathy data
@@ -106,6 +106,7 @@ class XTFHeaderType(IntEnum):
     coda_echoscope_image = 72           # Custom CODA Echoscope image
     edgetech_4600 = 73
     multibeam_raw_beam_angle = 74       # Note: Unsure if this is the correct name for this header-type
+    reson_7018_watercolumn = 78
     sourcetime_gyro = 84                # Note: XTF_HEADER_GYRO is defined as 23 (difference is receive/source time)
     reson_position = 100                # Raw position packet, reserved for use by Reson, Inc. RESON ONLY
     bathy_proc = 102
@@ -739,7 +740,7 @@ class XTFPingHeader(XTFPacketStart):
                     samples = np.frombuffer(samples, dtype=xtf_dtype[file_header.sonar_info[i].BytesPerSample])
                     p_header.data.append(samples)
 
-            elif p_header.HeaderType in cls._bathy_header_types:
+            elif p_header.HeaderType == XTFHeaderType.bathy_xyza:
                 # Bathymetry uses the same header as sonar, but without the XTFPingChanHeaders
 
                 # TODO: Should the sub-channel number be used to index chan_info (?)
@@ -751,19 +752,37 @@ class XTFPingHeader(XTFPacketStart):
                 if not samples:
                     raise Exception('XTF data packets missing (file corrupt?)')
 
-                if p_header.HeaderType == XTFHeaderType.bathy_xyza:
-                    # Processed bathy data consists of repeated XTFBeamXYZA structures
-                    # Note: Using a ctypes array is a _lot_ faster than constructing a list of BeamXYZA
-                    num_xyza = n_bytes // ctypes.sizeof(XTFBeamXYZA)
-                    xyza_array_type = XTFBeamXYZA * num_xyza
-                    xyza_array_type._pack_ = 1
-                    p_header.data = xyza_array_type.from_buffer_copy(samples)
-                else:
-                    # Return raw bathy data as numpy array (NB: in list for consistency with sonar structure)
-                    # The data is vendor specific, and therefore cannot be interpreted here
-                    p_header.data = [np.frombuffer(samples, dtype=np.uint8)]
+                # Processed bathy data consists of repeated XTFBeamXYZA structures
+                # Note: Using a ctypes array is a _lot_ faster than constructing a list of BeamXYZA
+                num_xyza = n_bytes // ctypes.sizeof(XTFBeamXYZA)
+                xyza_array_type = XTFBeamXYZA * num_xyza
+                xyza_array_type._pack_ = 1
+                p_header.data = xyza_array_type.from_buffer_copy(samples)
+
+            elif p_header.HeaderType == XTFHeaderType.reson_7018_watercolumn:
+                # 7018 watercolumn consists of XTFPingHeader followed by (one?) XTFPingChanHeader, then vendor data
+
+                # Retrieve XTFPingChanHeader
+                p_chan = XTFPingChanHeader(buffer=buffer)
+                p_header.ping_chan_headers.append(p_chan)
+
+                # Read the data that follows
+                n_bytes = p_header.NumBytesThisRecord - ctypes.sizeof(XTFPingHeader) - ctypes.sizeof(XTFPingChanHeader)
+                samples = buffer.read(n_bytes)
+                if not samples:
+                    raise Exception('XTF data packets missing (file corrupt?)')
+
+                p_header.data = samples
+
             else:
-                raise RuntimeError('Unknown XTFPingHeader type encountered.')
+                # Generic XTFPingHeader construction
+                n_bytes = p_header.NumBytesThisRecord - ctypes.sizeof(XTFPingHeader)
+                samples = buffer.read(n_bytes)
+                if not samples and n_bytes > 0:
+                    raise Exception('XTF data packets missing (file corrupt?)')
+
+                # The data is the raw bytes following the header
+                p_header.data = samples
 
         return p_header
 
@@ -1108,6 +1127,10 @@ XTFPacketClasses = {
     XTFHeaderType.sonar: XTFPingHeader,
     XTFHeaderType.bathy: XTFPingHeader,
     XTFHeaderType.bathy_xyza: XTFPingHeader,
+    XTFHeaderType.multibeam_raw_beam_angle: XTFPingHeader,
+    XTFHeaderType.reson_7125_snippet: XTFPingHeader,  # The custom vendor data is returned as raw bytes
+    XTFHeaderType.reson_7125: XTFPingHeader,  # The custom vendor data is returned as raw bytes
+    XTFHeaderType.reson_7018_watercolumn: XTFPingHeader,  # The custom vendor data is returned as raw bytes
     XTFHeaderType.attitude: XTFAttitudeData,
     XTFHeaderType.notes: XTFNotesHeader,
     XTFHeaderType.raw_serial: XTFRawSerialHeader,
