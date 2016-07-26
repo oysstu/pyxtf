@@ -11,7 +11,6 @@ use little endian byte ordering. Beware that others might not.
 import ctypes
 from enum import IntEnum, unique
 from io import IOBase, BytesIO
-import numpy as np
 from pyxtf.xtf_ctypes import XTFBase
 import warnings
 
@@ -231,8 +230,13 @@ if __name__ == '__main__':
     test_path = r'..\..\data\Survey\27apr\EM2040\em2040-0007-l02-20160427-124929_RAW.xtf'
     (fh, p) = xtf_read(test_path)
 
+    print('The following (supported) packets are present (XTFHeaderType:count): \n\t{}\n'.format(
+        str([key.name + ':{}'.format(len(v)) for key, v in p.items()])
+    ))
+
     if XTFHeaderType.multibeam_raw_beam_angle in p:
-        data1 = p[XTFHeaderType.multibeam_raw_beam_angle][0].data[0].tobytes()
-        d1 = KMRawRangeAngle78(data1)
-        print(d1)
+        # The KMRawRangeAngle78 data is stored as raw bytes in the data field of a XTFPingHeader type
+        data_bytes = p[XTFHeaderType.multibeam_raw_beam_angle][0].data
+        decoded_data = KMRawRangeAngle78(data_bytes)
+        print(decoded_data)
 
