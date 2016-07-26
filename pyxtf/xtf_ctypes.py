@@ -709,7 +709,7 @@ class XTFPingHeader(XTFPacketStart):
         p_header = super().__new__(cls, buffer=buffer, file_header=file_header)
 
         p_header.ping_chan_headers = []  # type: List[XTFPingChanHeader]
-        p_header.data = []  # type: List[np.ndarray]
+        p_header.data = None
 
         if buffer:
             if not file_header:
@@ -717,6 +717,8 @@ class XTFPingHeader(XTFPacketStart):
 
             # Sonar and bathy has a different data structure following the header
             if p_header.HeaderType == XTFHeaderType.sonar:
+                p_header.data = []  # type: List[np.ndarray]
+
                 for i in range(0, p_header.NumChansToFollow):
                     # Retrieve XTFPingChanHeader for this channel
                     p_chan = XTFPingChanHeader(buffer=buffer)
