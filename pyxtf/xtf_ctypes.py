@@ -1,6 +1,6 @@
 import ctypes
 from datetime import date
-from enum import IntEnum, unique
+from enum import IntEnum, unique, Enum
 from io import IOBase, BytesIO
 from typing import List
 
@@ -36,15 +36,39 @@ xtf_dtype = {
     8: np.uint64
 }
 
+
 class AutoIntEnum(IntEnum):
     """
-    Enumeration that automatically increments subsequent elements.
+    Integer enumeration that automatically increments subsequent elements.
+    Comparison with int succeeds.
     """
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         value = len(cls.__members__)
-        obj = int.__new__(cls)
+        obj = super(IntEnum, cls).__new__(cls)
         obj._value_ = value
         return obj
+
+    def __int__(self):
+        return self.value
+
+    def __eq__(self, other):
+        return int(self).__eq__(other) if isinstance(other, int) else Enum.__eq__(self, other)
+
+    def __ne__(self, other):
+        return int(self).__ne__(other) if isinstance(other, int) else Enum.__ne__(self, other)
+
+    def __ge__(self, other):
+        return int(self).__ge__(other) if isinstance(other, int) else Enum.__ge__(self, other)
+
+    def __gt__(self, other):
+        return int(self).__gt__(other) if isinstance(other, int) else Enum.__gt__(self, other)
+
+    def __le__(self, other):
+        return int(self).__le__(other) if isinstance(other, int) else Enum.__le__(self, other)
+
+    def __lt__(self, other):
+        return int(self).__lt__(other) if isinstance(other, int) else Enum.__lt__(self, other)
+
 
 @unique
 class XTFChannelType(AutoIntEnum):
@@ -206,7 +230,8 @@ class XTFSonarType(AutoIntEnum):
     fsi_hms6x4 = ()
     fsi_hms6x5 = ()
 
-assert XTFSonarType.fsi_hms6x5 != 69, 'XTFSonarType enumeration ends on incorrect number'
+
+assert XTFSonarType.fsi_hms6x5 == 69, 'XTFSonarType enumeration ends on incorrect number'
 
 #endregion
 
