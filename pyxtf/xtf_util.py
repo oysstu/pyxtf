@@ -1,8 +1,9 @@
-from typing import Union, List
-import numpy as np
-import matplotlib.pyplot as plt
 import tkinter as tk
 from tkinter import filedialog
+from typing import Union, List
+from warnings import warn
+import matplotlib.pyplot as plt
+import numpy as np
 from pyxtf import xtf_read, XTFHeaderType, XTFHeaderNavigation
 
 
@@ -16,6 +17,11 @@ def datetime64_to_utc(dt64: Union[np.datetime64, np.ndarray]) -> Union[float, np
 
 
 def plot_navigation(paths: List[str] = None):
+    """
+    Plots navigation packets in the list of files. If paths is None, a file open dialog is shown
+    :param paths: List of paths to plot nav data for
+    :return: None
+    """
     # TODO: Plot navigation from other packets if navigation packets not present.
 
     # Open file dialog if paths not specified
@@ -42,7 +48,7 @@ def plot_navigation(paths: List[str] = None):
         plt.plot(x, y)
         plt.show()
     else:
-        print('No navigation packets present in XTF files')
+        warn('No navigation packets present in XTF files')
 
 
 if __name__ == '__main__':

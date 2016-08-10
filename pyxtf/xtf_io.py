@@ -1,9 +1,9 @@
-import warnings
-from typing import Tuple, Callable, Any, Dict, Union, Generator
-from os.path import splitext, isfile
 import pickle
-from itertools import repeat
 from heapq import merge  # Used to merge sorted lists (file pos)
+from itertools import repeat
+from os.path import splitext, isfile
+from typing import Tuple, Any, Dict, Union, Generator, Iterable
+from warnings import warn
 
 from pyxtf.xtf_ctypes import *
 
@@ -20,7 +20,7 @@ def xtf_padding(size: int) -> int:
 
 def xtf_idx_pos_iter(
         xtf_idx: Dict[XTFHeaderType, List[int]],
-        types: List[XTFHeaderType]) -> Generator[Tuple[int, XTFHeaderType], None, None]:
+        types: List[XTFHeaderType]) -> Iterable[Tuple[int, XTFHeaderType]]:
     """
     Returns an iterator of tuples (file_pos, header_type) sorted by file position (merges the header types)
     :param xtf_idx: The dictionary index object
@@ -36,7 +36,8 @@ def xtf_idx_pos_iter(
     return merge(*xtf_idx_iters)
 
 
-def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[Union[XTFFileHeader, XTFPacket], None, None]:
+def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[
+    Union[XTFFileHeader, XTFPacket], None, None]:
     """
     Generator object which iterates over the XTF file, return first the file header and then subsequent packets
     :param path: The path to the XTF file
@@ -49,7 +50,7 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[Unio
     has_idx = isfile(path_idx)
     if has_idx:
         with open(path_idx, 'rb') as f_idx:
-            xtf_idx = pickle.load(f_idx)  # type: Dict[XTFHeaderType, List[int]]]
+            xtf_idx = pickle.load(f_idx)  # type: Dict[XTFHeaderType, List[int]]
     else:
         xtf_idx = {}
 
@@ -79,7 +80,7 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[Unio
                     yield p_header
                 else:
                     warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
-                    warnings.warn(warning_str)
+                    warn(warning_str)
         else:
             # Preallocate, as it is assigned to at every iteration
             p_start = XTFPacketStart()
@@ -110,7 +111,7 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[Unio
                         yield p_header
                     else:
                         warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
-                        warnings.warn(warning_str)
+                        warn(warning_str)
 
                 # Skip over any data padding before next iteration
                 f.seek(packet_start_loc + p_start.NumBytesThisRecord)
@@ -151,14 +152,22 @@ def xtf_read(path: str, types: List[XTFHeaderType] = None) -> Tuple[XTFFileHeade
     return file_header, packets
 
 
-def concatenate_channel(pings: List[XTFPingHeader], chan_info: XTFChanInfo, channel: int, weighted = False) -> np.ndarray:
+def concatenate_channel(
+        pings: List[XTFPingHeader],
+        file_header: XTFFileHeader,
+        channel: int,
+        weighted: bool = False) -> np.ndarray:
     """
     Concatenates the list of individual pings, and pads as necessary on the correct side to form a dense representation.
-    :param chan_pings: The list of pings for one channel.
-    :param chan_type: The channel info header to determine which side to pad (sidescan sonar port/stbd/other)
+    :param pings: A list of ping packets to concatenate
+    :param file_header: The file header header (used to determine channel types, stbd/port sonar)
+    :param channel: The channel number to concatenate
     :param weighted: If true, the data is multiplied with the ping chan header weight parameter, 2 ** -N
-    :return:
+    :return: The sonar image as a dense numpy array
     """
+    # Sort pings by time
+    pings.sort(key=XTFPingHeader.get_time)
+
     # find array of largest size
     sizes = [ping.data[channel].shape[0] for ping in pings]
     min_sz, max_sz = min(sizes), max(sizes)
@@ -168,7 +177,7 @@ def concatenate_channel(pings: List[XTFPingHeader], chan_info: XTFChanInfo, chan
         out_array = np.vstack([ping.data[channel] for ping in pings[::-1]])
     else:
         # Get type of this channel
-        chan_type = chan_info[pings[0].ping_chan_headers[channel].ChannelNumber].TypeOfChannel
+        chan_type = file_header.ChanInfo[pings[0].ping_chan_headers[channel].ChannelNumber].TypeOfChannel
 
         out_array = np.empty(shape=(len(pings), max_sz), dtype=pings[0].data[0].dtype)
         for i, ping in enumerate(pings[::-1]):
@@ -178,14 +187,14 @@ def concatenate_channel(pings: List[XTFPingHeader], chan_info: XTFChanInfo, chan
                 out_array[i, :sz] = ping.data[channel]
                 out_array[i, sz:] = 0
             elif chan_type == XTFChannelType.port:
-                out_array[i, :max_sz-sz] = 0
-                out_array[i, max_sz-sz:] = ping.data[channel]
+                out_array[i, :max_sz - sz] = 0
+                out_array[i, max_sz - sz:] = ping.data[channel]
             else:
                 # All other types: pad each side equally
                 pad_div = (max_sz - sz) // 2
                 remainder = 1 if (max_sz - sz) % 2 else 0
                 out_array[i, :pad_div] = 0
-                out_array[i, pad_div:max_sz-(pad_div+remainder)] = ping.data[channel]
+                out_array[i, pad_div:max_sz - (pad_div + remainder)] = ping.data[channel]
                 out_array[i, -pad_div:] = 0
 
     if weighted:
@@ -203,7 +212,7 @@ if __name__ == '__main__':
     (fh, p) = xtf_read(test_path)
 
     print('The following (supported) packets are present (XTFHeaderType:count): \n\t' +
-          str([key.name +':{}'.format(len(v)) for key, v in p.items()]))
+          str([key.name + ':{}'.format(len(v)) for key, v in p.items()]))
 
     # Get multibeam (xyza) if present
     if XTFHeaderType.bathy_xyza in p:
@@ -217,13 +226,13 @@ if __name__ == '__main__':
     # Get sonar if present
     if XTFHeaderType.sonar in p:
         upper_limit = 2 ** 16
-        np_chan1 = concatenate_channel(p[XTFHeaderType.sonar], fh.ChanInfo, channel=0, weighted=True)
-        np_chan2 = concatenate_channel(p[XTFHeaderType.sonar], fh.ChanInfo, channel=1, weighted=True)
+        np_chan1 = concatenate_channel(p[XTFHeaderType.sonar], file_header=fh, channel=0, weighted=True)
+        np_chan2 = concatenate_channel(p[XTFHeaderType.sonar], file_header=fh, channel=1, weighted=True)
 
         # Clip to range (max cannot be used due to outliers)
         # More robust methods are possible (through histograms / statistical outlier removal)
-        np_chan1.clip(0, upper_limit-1, out=np_chan1)
-        np_chan2.clip(0, upper_limit-1, out=np_chan2)
+        np_chan1.clip(0, upper_limit - 1, out=np_chan1)
+        np_chan2.clip(0, upper_limit - 1, out=np_chan2)
 
         # The sonar data is logarithmic (dB), add small value to avoid log10(0)
         np_chan1 = np.log10(np_chan1 + 1)
@@ -239,9 +248,9 @@ if __name__ == '__main__':
         ax2.imshow(np_chan2, cmap='gray', vmin=0, vmax=np.log10(upper_limit))
 
         # The following plots a signal-view of the 100th ping (in the file)
-        #fig, (ax1, ax2) = plt.subplots(2,1)
-        #ax1.plot(np.arange(0, np_chan1.shape[1]), np_chan1[196, :])
-        #ax2.plot(np.arange(0, np_chan2.shape[1]), np_chan2[196, :])
+        # fig, (ax1, ax2) = plt.subplots(2,1)
+        # ax1.plot(np.arange(0, np_chan1.shape[1]), np_chan1[196, :])
+        # ax2.plot(np.arange(0, np_chan2.shape[1]), np_chan2[196, :])
 
     if XTFHeaderType.attitude in p:
         pings = p[XTFHeaderType.attitude]  # type: List[XTFAttitudeData]
@@ -250,8 +259,8 @@ if __name__ == '__main__':
         roll = [ping.Roll for ping in pings]
         heading = [ping.Heading for ping in pings]
 
-        fig, (ax1, ax2) = plt.subplots(2,1)
-        ax1.plot(range(0,len(heave)), heave, label='heave')
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+        ax1.plot(range(0, len(heave)), heave, label='heave')
         ax1.plot(range(0, len(pitch)), pitch, label='pitch')
         ax1.plot(range(0, len(roll)), roll, label='roll')
         ax1.legend()
@@ -264,8 +273,8 @@ if __name__ == '__main__':
         x = [ping.RawXcoordinate for ping in pings]
         y = [ping.RawYcoordinate for ping in pings]
 
-        fig, (ax1, ax2, ax3) = plt.subplots(3,1)
-        ax1.plot(range(0,len(alt)), alt, label='altitude')
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1)
+        ax1.plot(range(0, len(alt)), alt, label='altitude')
         ax1.set_title('altitude')
         ax2.plot(range(0, len(x)), x, label='x')
         ax2.set_title('x')
@@ -273,6 +282,4 @@ if __name__ == '__main__':
         ax3.set_title('y')
 
     plt.show()
-
-
 
