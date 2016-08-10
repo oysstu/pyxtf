@@ -1,5 +1,9 @@
 import warnings
 from typing import Tuple, Callable, Any, Dict, Union, Generator
+from os.path import splitext, isfile
+import pickle
+from itertools import repeat
+from heapq import merge  # Used to merge sorted lists (file pos)
 
 from pyxtf.xtf_ctypes import *
 
@@ -14,6 +18,24 @@ def xtf_padding(size: int) -> int:
     return ((size + 63) // 64) * 64
 
 
+def xtf_idx_pos_iter(
+        xtf_idx: Dict[XTFHeaderType, List[int]],
+        types: List[XTFHeaderType]) -> Generator[Tuple[int, XTFHeaderType], None, None]:
+    """
+    Returns an iterator of tuples (file_pos, header_type) sorted by file position (merges the header types)
+    :param xtf_idx: The dictionary index object
+    :param types: The packet types to return, None returns all types
+    :return: Generator object
+    """
+    if types:
+        xtf_idx_iters = [zip(xtf_idx[key], repeat(key)) for key in types if key in xtf_idx]
+    else:
+        xtf_idx_iters = [zip(val, repeat(key)) for key, val in xtf_idx.items()]
+
+    # Use the heapq.merge function to return sorted iterator of file indices
+    return merge(*xtf_idx_iters)
+
+
 def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[Union[XTFFileHeader, XTFPacket], None, None]:
     """
     Generator object which iterates over the XTF file, return first the file header and then subsequent packets
@@ -21,6 +43,17 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[Unio
     :param types: Optional list of XTFHeaderTypes to keep. Default (None) returns all types. Can improve performance
     :return: None
     """
+    # Read index file if it exists
+    (path_root, _) = splitext(path)
+    path_idx = path_root + '.pyxtf_idx'
+    has_idx = isfile(path_idx)
+    if has_idx:
+        with open(path_idx, 'rb') as f_idx:
+            xtf_idx = pickle.load(f_idx)  # type: Dict[XTFHeaderType, List[int]]]
+    else:
+        xtf_idx = {}
+
+    # Read XTF file
     with open(path, 'rb') as f:
         # Read initial file header
         file_header = XTFFileHeader(buffer=f)
@@ -32,49 +65,66 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[Unio
         # Return the file header before starting packet iteration
         yield file_header
 
-        # Channel info
-        chan_info = [file_header.ChanInfo[i] for i in range(0, n_channels)]  #type: List[XTFChanInfo]
-
         # Loop through XTF packets and handle according to type
-        packets = {}  # type: Dict[XTFHeaderType, List[Any]]
-        bathy_header_types = [
-            XTFHeaderType.bathy_xyza.value,
-            XTFHeaderType.bathy.value,
-            XTFHeaderType.multibeam_raw_beam_angle
-        ]
-
-        # Preallocate, as they are assigned to at every iteration
-        p_start = XTFPacketStart()
-        while True:
-            # Test for file end without advancing the file position
-            if not f.peek(1):
-                break
-
-            # Save packet start location
-            packet_start_loc = f.tell()
-
-            # Read the first few shared packet bytes without advancing file pointer
-            bytes_read = f.readinto(p_start)
-            if bytes_read < ctypes.sizeof(XTFPacketStart):
-                raise RuntimeError('XTF file shorter than expected while reading packet.')
-
+        if has_idx:
             # Only return packets that matches types arg (if None, return all)
-            p_headertype = XTFHeaderType(p_start.HeaderType)
-            if not types or p_headertype in types:
-                f.seek(packet_start_loc)
+            for packet_start_loc, p_headertype in xtf_idx_pos_iter(xtf_idx, types):
+                if not types or p_headertype in types:
+                    f.seek(packet_start_loc)
 
-                # Get the class assosciated with this header type (if any)
-                # How to read and construct each type is implemented in the class (default impl. in XTFBase.__new__)
-                p_class = XTFPacketClasses.get(p_headertype, None)
-                if p_class:
-                    p_header = p_class(buffer=f, file_header=file_header)
-                    yield p_header
-                else:
-                    warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
-                    warnings.warn(warning_str)
+                    # Get the class associated with this header type (if any)
+                    # How to read and construct each type is implemented in the class (default impl. in XTFBase.__new__)
+                    p_class = XTFPacketClasses.get(p_headertype, None)
+                    if p_class:
+                        p_header = p_class(buffer=f, file_header=file_header)
+                        yield p_header
+                    else:
+                        warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
+                        warnings.warn(warning_str)
+        else:
+            # Preallocate, as it is assigned to at every iteration
+            p_start = XTFPacketStart()
 
-            # Skip over any data padding before next iteration
-            f.seek(packet_start_loc + p_start.NumBytesThisRecord)
+            while True:
+                # Test for file end without advancing the file position
+                if not f.peek(1):
+                    break
+
+                # Save packet start location
+                packet_start_loc = f.tell()
+
+                # Read the first few shared packet bytes without advancing file pointer
+                bytes_read = f.readinto(p_start)
+                if bytes_read < ctypes.sizeof(XTFPacketStart):
+                    raise RuntimeError('XTF file shorter than expected while reading packet.')
+
+                # Only return packets that matches types arg (if None, return all)
+                p_headertype = XTFHeaderType(p_start.HeaderType)
+                if not types or p_headertype in types:
+                    f.seek(packet_start_loc)
+
+                    # Get the class associated with this header type (if any)
+                    # How to read and construct each type is implemented in the class (default impl. in XTFBase.__new__)
+                    p_class = XTFPacketClasses.get(p_headertype, None)
+                    if p_class:
+                        p_header = p_class(buffer=f, file_header=file_header)
+                        yield p_header
+                    else:
+                        warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
+                        warnings.warn(warning_str)
+
+                # Skip over any data padding before next iteration
+                f.seek(packet_start_loc + p_start.NumBytesThisRecord)
+
+                # Store index file information
+                try:
+                    xtf_idx[p_headertype].append(packet_start_loc)
+                except KeyError:
+                    xtf_idx[p_headertype] = [packet_start_loc]
+
+            # Pickle index file
+            with open(path_idx, mode='wb') as f_idx:
+                pickle.dump(xtf_idx, f_idx)
 
         return
 
@@ -100,29 +150,6 @@ def xtf_read(path: str, types: List[XTFHeaderType] = None) -> Tuple[XTFFileHeade
             packets[p_headertype] = [packet]
 
     return file_header, packets
-
-
-def xtf_peek(path: str, properties: List[Callable[[ctypes.Structure], Any]] = None) -> List[List[Any]]:
-    """
-    An alternative to xtf_read, where only the properties returned through a lambda/function is stored.
-    This can be used to optimize disk access for situations where partial information is needed (e.g only timestamps).
-    :param path: The path to the XTF file.
-    :param properties: A callable (function/lambda) that takes one of the XTF-structures and returns the data from it
-    :return: A list containing the selected properties (List of lists, since multiple occurances exist for each type)
-    """
-    # NOTE: This should be done through the property offsets to avoid having to construct the c-structure completely
-    raise NotImplementedError('xtf_peek is not implemented yet')
-
-
-def xtf_generate_index(path: str):
-    """
-    Generates an index file over the packets present in the xtf file to speed up selective reading / peeking.
-    The index is stored in a dictionary, which is pickeled to a file with an .pyxtf extension.
-    :param path: The path to the XTF file.
-    :return: None
-    """
-    raise NotImplementedError('xtf_generate_index is not implemented yet')
-    pass
 
 
 def concatenate_channel(pings: List[XTFPingHeader], chan_info: XTFChanInfo, channel: int, weighted = False) -> np.ndarray:
@@ -200,8 +227,8 @@ if __name__ == '__main__':
         np_chan2.clip(0, upper_limit-1, out=np_chan2)
 
         # The sonar data is logarithmic (dB), add small value to avoid log10(0)
-        np_chan1 = np.log10(np_chan1 + 0.00001)
-        np_chan2 = np.log10(np_chan2 + 0.00001)
+        np_chan1 = np.log10(np_chan1 + 1)
+        np_chan2 = np.log10(np_chan2 + 1)
 
         # Transpose so that the largest axis is horizontal
         np_chan1 = np_chan1 if np_chan1.shape[0] < np_chan1.shape[1] else np_chan1.T
