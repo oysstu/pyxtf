@@ -69,18 +69,17 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[Unio
         if has_idx:
             # Only return packets that matches types arg (if None, return all)
             for packet_start_loc, p_headertype in xtf_idx_pos_iter(xtf_idx, types):
-                if not types or p_headertype in types:
-                    f.seek(packet_start_loc)
+                f.seek(packet_start_loc)
 
-                    # Get the class associated with this header type (if any)
-                    # How to read and construct each type is implemented in the class (default impl. in XTFBase.__new__)
-                    p_class = XTFPacketClasses.get(p_headertype, None)
-                    if p_class:
-                        p_header = p_class(buffer=f, file_header=file_header)
-                        yield p_header
-                    else:
-                        warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
-                        warnings.warn(warning_str)
+                # Get the class associated with this header type (if any)
+                # How to read and construct each type is implemented in the class (default impl. in XTFBase.__new__)
+                p_class = XTFPacketClasses.get(p_headertype, None)
+                if p_class:
+                    p_header = p_class(buffer=f, file_header=file_header)
+                    yield p_header
+                else:
+                    warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
+                    warnings.warn(warning_str)
         else:
             # Preallocate, as it is assigned to at every iteration
             p_start = XTFPacketStart()
