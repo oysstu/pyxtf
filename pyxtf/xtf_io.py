@@ -209,6 +209,7 @@ if __name__ == '__main__':
 
     # Read file header and packets
     test_path = r'..\data\DemoFiles\Isis_Sonar_XTF\Reson7125.XTF'
+    test_path = r'/media/oysstu/LocalShare/cruise2016/EM2040/AUV8/em2040-0052-cam02-20160830-124159.xtf'
     (fh, p) = xtf_read(test_path)
 
     print('The following (supported) packets are present (XTFHeaderType:count): \n\t' +
@@ -219,9 +220,11 @@ if __name__ == '__main__':
         np_mb = [[y.fDepth for y in x.data] for x in p[XTFHeaderType.bathy_xyza]]
         np_mb = np.vstack(np_mb)
         # Transpose if the longest axis is vertical
-        np_mb = np_mb if np_mb.shape[0] < np_mb.shape[1] else np_mb.T
+        is_horizontal = np_mb.shape[0] < np_mb.shape[1]
+        np_mb = np_mb if is_horizontal else np_mb.T
         plt.figure()
         plt.imshow(np_mb, cmap='hot')
+        plt.colorbar(orientation='horizontal')
 
     # Get sonar if present
     if XTFHeaderType.sonar in p:

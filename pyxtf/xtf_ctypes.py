@@ -280,7 +280,11 @@ class XTFBase(ctypes.LittleEndianStructure):
                         offset = 2 ** 31
 
                     if ctypes.Array in field_type.__bases__ and field_type._type_ not in [ctypes.c_char, ctypes.c_wchar]:
-                        out_str = '{}: {}\n'.format(field_name, list(field_value))
+                        if len(field_value) > 20:
+                            val_str = field_value[:10] + ['...'] + field_value[-10:]
+                        else:
+                            val_str = list(field_value)
+                        out_str = '{}: {}\n'.format(field_name, val_str)
                     else:
                         out_str = '{}: {}\n'.format(field_name, field_value)
 
