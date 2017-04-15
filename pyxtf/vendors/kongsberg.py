@@ -105,7 +105,7 @@ class KMRawRangeAngle78_RX(XTFBase):
         ('SectorNumber', ctypes.c_uint8),  # Transmit sector number
         ('DetectionInfo', ctypes.c_uint8),
         ('DetectionWindowLength', ctypes.c_uint16),
-        ('QualityFactor', ctypes.c_uint8),
+        ('QualityFactor', ctypes.c_uint8),  # QF = 2500 * stddev / detection range
         ('DCorr', ctypes.c_int8),
         ('TravelTime', ctypes.c_float),  # Two way travel time
         ('Reflectivity', ctypes.c_int16),  # in 0.1 dB
