@@ -586,8 +586,14 @@ class XTFPingHeader(XTFPacketStart):
                     samples = buffer.read(n_samples * file_header.sonar_info[i].BytesPerSample)
                     if not samples:
                         raise RuntimeError('File ended while reading data packets (file corrupt?)')
-                    #favor getting the sample format from the dedicated field added in X41. If the field is not populated deduce the type from the bytes per sample field.
-                    sample_format = sample_format_dtype[file_header.sonar_info[i].SampleFormat] if file_header.sonar_info[i].SampleFormat in sample_format_dtype else xtf_dtype[file_header.sonar_info[i].BytesPerSample]
+
+                    # Favor getting the sample format from the dedicated field added in X41.
+                    # If the field is not populated deduce the type from the bytes per sample field.
+                    if file_header.sonar_info[i].SampleFormat in sample_format_dtype:
+                        sample_format = sample_format_dtype[file_header.sonar_info[i].SampleFormat]
+                    else:
+                        sample_format = xtf_dtype[file_header.sonar_info[i].BytesPerSample]
+
                     samples = np.frombuffer(samples, dtype=sample_format)
                     p_header.data.append(samples)
 
