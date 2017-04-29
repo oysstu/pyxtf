@@ -34,6 +34,26 @@ xtf_dtype = {
     8: np.uint64
 }
 
+"""
+SampleFormat field added in X41
+0 = Legacy 
+1 = 4-byte IBM float 
+2 = 4-byte integer 
+3 = 2-byte integer 
+4 = unused 
+5 = 4-byte IEEE float 
+6 = unused 
+7 = unused 
+8 = 1-byte integer
+"""
+# Mapping from 'sample format' to the numpy type
+sample_format_dtype = {
+    2: np.uint32,
+    3: np.uint16,
+    5: np.float32,
+    8: np.uint8
+}
+
 
 class XTFBase(ctypes.LittleEndianStructure):
     """
@@ -116,7 +136,8 @@ class XTFChanInfo(XTFBase):
         ('OffsetPitch', ctypes.c_float),
         ('OffsetRoll', ctypes.c_float),
         ('BeamsPerArray', ctypes.c_uint16),
-        ('ReservedArea2', ctypes.c_uint8 * 54)
+		('SampleFormat', ctypes.c_uint8),
+        ('ReservedArea2', ctypes.c_uint8 * 53)
     ]
 
     def __new__(cls, buffer: IOBase = None):
@@ -565,7 +586,9 @@ class XTFPingHeader(XTFPacketStart):
                     samples = buffer.read(n_samples * file_header.sonar_info[i].BytesPerSample)
                     if not samples:
                         raise RuntimeError('File ended while reading data packets (file corrupt?)')
-                    samples = np.frombuffer(samples, dtype=xtf_dtype[file_header.sonar_info[i].BytesPerSample])
+                    #favor getting the sample format from the dedicated field added in X41. If the field is not populated deduce the type from the bytes per sample field.
+                    sample_format = sample_format_dtype[file_header.sonar_info[i].SampleFormat] if file_header.sonar_info[i].SampleFormat in sample_format_dtype else xtf_dtype[file_header.sonar_info[i].BytesPerSample]
+                    samples = np.frombuffer(samples, dtype=sample_format)
                     p_header.data.append(samples)
 
             elif p_header.HeaderType == XTFHeaderType.bathy_xyza:
