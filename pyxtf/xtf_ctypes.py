@@ -46,6 +46,7 @@ SampleFormat field added in X41
 7 = unused 
 8 = 1-byte integer
 """
+
 # Mapping from 'sample format' to the numpy type
 sample_format_dtype = {
     2: np.uint32,
@@ -136,7 +137,7 @@ class XTFChanInfo(XTFBase):
         ('OffsetPitch', ctypes.c_float),
         ('OffsetRoll', ctypes.c_float),
         ('BeamsPerArray', ctypes.c_uint16),
-		('SampleFormat', ctypes.c_uint8),
+        ('SampleFormat', ctypes.c_uint8),
         ('ReservedArea2', ctypes.c_uint8 * 53)
     ]
 
@@ -188,11 +189,6 @@ class XTFFileHeader(XTFBase):
         ('ChanInfo', XTFChanInfo * 6)
     ]
 
-    sonar_chan_types = [
-        XTFChannelType.port.value,
-        XTFChannelType.stbd.value,
-        XTFChannelType.subbottom.value]
-
     def channel_count(self, verbose: bool = False) -> int:
         """
         Returns the number of separate channels present in the XTF file.
@@ -226,7 +222,9 @@ class XTFFileHeader(XTFBase):
 
         if buffer:
             chan_info = [self.ChanInfo[i] for i in range(0, self.channel_count())]  # type: List[XTFChanInfo]
-            self.sonar_info = [x for x in chan_info if x.TypeOfChannel in XTFFileHeader.sonar_chan_types]
+            self.subbottom_info = [x for x in chan_info if x.TypeOfChannel == XTFChannelType.subbottom]
+            sonar_types = (XTFChannelType.port.value, XTFChannelType.stbd.value)
+            self.sonar_info = [x for x in chan_info if x.TypeOfChannel in sonar_types]
             self.bathy_info = [x for x in chan_info if x.TypeOfChannel == XTFChannelType.bathy.value]
         else:
             self.FileFormat = 0x7B
@@ -287,8 +285,6 @@ class XTFPacket(XTFBase):
 
             if hasattr(self, 'Microsecond'):
                 p_time += np.timedelta64(self.Microsecond, 'us')
-
-        #print(self.Year, self.Month, self.Day, self.Hour, self.Minute, self.Second, self.Millisecond)
 
         return p_time
 
@@ -617,7 +613,7 @@ class XTFPingHeader(XTFPacketStart):
                 p_header.data = xyza_array_type.from_buffer_copy(samples)
 
             elif p_header.HeaderType == XTFHeaderType.reson_7018_watercolumn:
-                # 7018 watercolumn consists of XTFPingHeader followed by (one?) XTFPingChanHeader, then vendor data
+                # 7018 water column consists of XTFPingHeader followed by (one?) XTFPingChanHeader, then vendor data
 
                 # Retrieve XTFPingChanHeader
                 p_chan = XTFPingChanHeader(buffer=buffer)
@@ -979,7 +975,7 @@ class SNP1(XTFBase):
 
 
 # Mapping from enumerated header type to the class implementation
-# TODO: XTF Bathy snippets (SNP0/SNP1 etc) requires a custom implementation in xtf_read
+# TODO: XTF bathy snippets (SNP0/SNP1 etc) requires a custom implementation in xtf_read
 XTFPacketClasses = {
     XTFHeaderType.sonar: XTFPingHeader,
     XTFHeaderType.bathy: XTFPingHeader,
