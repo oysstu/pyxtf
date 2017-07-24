@@ -4,9 +4,9 @@ from pyxtf import xtf_read, concatenate_channel, XTFHeaderType
 
 
 # Read file header and packets
-# The following file can be downloaded from
+# The following file and others can be downloaded from
+# www.tritonimaginginc.com/site/content/public/downloads/DemoFiles/DemoFiles.zip
 test_path = r'..\data\DemoFiles\Isis_Sonar_XTF\Reson7125.XTF'
-test_path = r'/home/oysstu/devel/marmine_uhi/data/AUV8/EM2040/em2040-0054-cam03-20160830-124346.xtf'
 (fh, p) = xtf_read(test_path)
 
 print('The following (supported) packets are present (XTFHeaderType:count): \n\t' +
