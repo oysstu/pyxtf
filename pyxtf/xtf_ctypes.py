@@ -418,8 +418,6 @@ class XTFRawSerialHeader(XTFPacketStart):
     ]
 
 
-
-
 class XTFPingChanHeader(XTFBase):
     _pack_ = 1
     _fields_ = [
