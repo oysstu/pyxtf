@@ -221,11 +221,10 @@ class XTFFileHeader(XTFBase):
         super().__init__(buffer, *args, **kwargs)
 
         if buffer:
-            chan_info = [self.ChanInfo[i] for i in range(0, self.channel_count())]  # type: List[XTFChanInfo]
-            self.subbottom_info = [x for x in chan_info if x.TypeOfChannel == XTFChannelType.subbottom]
+            self.subbottom_info = [x for x in self.ChanInfo if x.TypeOfChannel == XTFChannelType.subbottom]
             sonar_types = (XTFChannelType.port.value, XTFChannelType.stbd.value)
-            self.sonar_info = [x for x in chan_info if x.TypeOfChannel in sonar_types]
-            self.bathy_info = [x for x in chan_info if x.TypeOfChannel == XTFChannelType.bathy.value]
+            self.sonar_info = [x for x in self.ChanInfo if x.TypeOfChannel in sonar_types][:self.NumberOfSonarChannels]
+            self.bathy_info = [x for x in self.ChanInfo if x.TypeOfChannel == XTFChannelType.bathy][:self.NumberOfBathymetryChannels]
         else:
             self.FileFormat = 0x7B
             self.SystemType = 1
