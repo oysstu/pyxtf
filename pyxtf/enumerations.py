@@ -44,7 +44,7 @@ class XTFChannelType(AutoIntEnum):
 @unique
 class XTFNavUnits(IntEnum):
     meters = 0
-    latlong = 3
+    latlon = 3
 
 @unique
 class XTFHeaderType(IntEnum):
@@ -193,6 +193,19 @@ class XTFSonarType(AutoIntEnum):
     fsi_hms622 = ()
     fsi_hms6x4 = ()
     fsi_hms6x5 = ()
+    deepvision_osm2 = 250
 
+
+@unique
+class XTFSampleFormat(IntEnum):
+    """
+    Used in the ChanInfo structures
+    """
+    legacy = 0
+    ibm_float = 1
+    int = 2
+    word = 3
+    float = 5
+    byte = 8
 
 assert XTFSonarType.fsi_hms6x5 == 69, 'XTFSonarType enumeration ends on incorrect number'
