@@ -35,8 +35,8 @@ if XTFHeaderType.sonar in p:
     np_chan2.clip(0, upper_limit - 1, out=np_chan2)
 
     # The sonar data is logarithmic (dB), add small value to avoid log10(0)
-    np_chan1 = np.log10(np_chan1 + 1)
-    np_chan2 = np.log10(np_chan2 + 1)
+    np_chan1 = np.log10(np_chan1 + 1, dtype=np.float32)
+    np_chan2 = np.log10(np_chan2 + 1, dtype=np.float32)
 
     # Transpose so that the largest axis is horizontal
     np_chan1 = np_chan1 if np_chan1.shape[0] < np_chan1.shape[1] else np_chan1.T
