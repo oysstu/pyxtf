@@ -11,6 +11,9 @@ use little endian byte ordering. Beware that others might not.
 import ctypes
 from enum import IntEnum, unique
 from io import IOBase, BytesIO
+import numpy as np
+from datetime import date
+
 from pyxtf.xtf_ctypes import XTFBase
 import warnings
 
@@ -50,7 +53,25 @@ class KMDatagramType(IntEnum):
     pu_bist_result = 0x42
 
 
-class KMOutputDatagramHeader(XTFBase):
+class KMBase(XTFBase):
+    def get_time(self):
+        if hasattr(self, 'Date') and hasattr(self, 'Time'):
+            Y = self.Date // 10000
+            M = (self.Date - Y * 10000) // 100
+            D = self.Date - M * 100 - Y * 10000
+
+            # Calculate time using common fields
+            p_time = np.datetime64(Y, 'Y') + \
+                     np.timedelta64(M, 'M') + \
+                     np.timedelta64(D, 'D') + \
+                     np.timedelta64(self.Time, 'ms')
+
+            t = self.Time
+            dt = np.datetime64('{}-{:0>2}-{}'.format(Y, M, D))
+            dt += np.timedelta64(t, 'ms')
+
+
+class KMOutputDatagramHeader(KMBase):
     '''
     Common starting header for all EM output datagrams
     '''
@@ -151,7 +172,7 @@ class KMRawRangeAngle78_RX(XTFBase):
         return bool(self.DetectionInfo & 0x10)
 
 
-class KMRawRangeAngle78(XTFBase):
+class KMRawRangeAngle78(KMBase):
     _pack_ = 1
     _fields_ = [
         ('NumberOfBytes', ctypes.c_uint32),
