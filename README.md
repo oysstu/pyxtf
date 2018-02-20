@@ -3,7 +3,7 @@ A library for reading eXtended Triton Format (XTF) files (revision 40)
 
 Current limitations:
  - Only supports python 3
- - Only read functionality is implemented, not write
+ - Only read functionality is directly supported (but possible)
  - Limited support for vendor-specific extensions
 
 ##### Installation
