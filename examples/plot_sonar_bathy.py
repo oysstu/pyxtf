@@ -12,15 +12,20 @@ test_path = r'Reson7125.XTF'
 print('The following (supported) packets are present (XTFHeaderType:count): \n\t' +
       str([key.name + ':{}'.format(len(v)) for key, v in p.items()]))
 
-# Get multibeam (xyza) if present
+# Get multibeam/bathy data (xyza) if present
 if XTFHeaderType.bathy_xyza in p:
     np_mb = [[y.fDepth for y in x.data] for x in p[XTFHeaderType.bathy_xyza]]
-    np_mb = np.vstack(np_mb)
+
+    # Allocate room (with padding in case of varying sizes)
+    mb_concat = np.full((len(np_mb), max([len(x) for x in np_mb])), dtype=np.float32, fill_value=np.nan)
+    for i, line in enumerate(np_mb):
+        mb_concat[i, :len(line)] = line
+
     # Transpose if the longest axis is vertical
-    is_horizontal = np_mb.shape[0] < np_mb.shape[1]
-    np_mb = np_mb if is_horizontal else np_mb.T
+    is_horizontal = mb_concat.shape[0] < mb_concat.shape[1]
+    mb_concat = mb_concat if is_horizontal else mb_concat.T
     plt.figure()
-    plt.imshow(np_mb, cmap='hot')
+    plt.imshow(mb_concat, cmap='hot')
     plt.colorbar(orientation='horizontal')
 
 # Get sonar if present
