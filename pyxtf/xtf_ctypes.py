@@ -3,6 +3,7 @@ from datetime import date
 from io import IOBase, BytesIO
 from typing import List
 import numpy as np
+from warnings import warn
 
 from pyxtf.enumerations import *
 
@@ -600,7 +601,7 @@ class XTFPingHeader(XTFPacketStart):
                 n_bytes = p_header.NumBytesThisRecord - ctypes.sizeof(XTFPingHeader)
                 samples = buffer.read(n_bytes)
                 if not samples:
-                    raise Exception('XTF data packets missing (file corrupt?)')
+                    warn('XTFBathyHeader without any data encountered.')
 
                 # Processed bathy data consists of repeated XTFBeamXYZA structures
                 # Note: Using a ctypes array is a _lot_ faster than constructing a list of BeamXYZA
@@ -620,7 +621,7 @@ class XTFPingHeader(XTFPacketStart):
                 n_bytes = p_header.NumBytesThisRecord - ctypes.sizeof(XTFPingHeader) - ctypes.sizeof(XTFPingChanHeader)
                 samples = buffer.read(n_bytes)
                 if not samples:
-                    raise Exception('XTF data packets missing (file corrupt?)')
+                    warn('XTFPingHeader (Reson7018) without any data encountered.')
 
                 p_header.data = samples
 
@@ -629,7 +630,7 @@ class XTFPingHeader(XTFPacketStart):
                 n_bytes = p_header.NumBytesThisRecord - ctypes.sizeof(XTFPingHeader)
                 samples = buffer.read(n_bytes)
                 if not samples and n_bytes > 0:
-                    raise Exception('XTF data packets missing (file corrupt?)')
+                    warn('XTFPingHeader without any data encountered.')
 
                 # The data is the raw bytes following the header
                 p_header.data = samples
