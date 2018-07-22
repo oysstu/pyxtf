@@ -1,15 +1,17 @@
 ### pyxtf
-A library for reading eXtended Triton Format (XTF) files (revision 44)
+A python library for reading eXtended Triton Format (XTF) files (revision 44)
 
-Current limitations:
- - Only supports python 3
- - Limited support for vendor-specific extensions
+##### Installation from pypi
 
-##### Installation
+```bash
+pip3 install pyxtf
+```
+
+##### Installation from source
 Clone or download the repository and run the following command. This requires setuptools to be installed.
 
 ```bash
-python setup.py install
+python3 setup.py install
 ```
 
 ###### Dependencies
@@ -36,13 +38,9 @@ sonar_packets = packets[pyxtf.XTFHeaderType.sonar]
 print(sonar_packets[0])
 ```
 
-A more involved example can be found in the [ipython notebook under examples](examples/sonar_example.ipynb).
-
-##### Scope
-There already exists a python2 project called [pyxtf](https://github.com/shamrin/pyxtf), but was more limited in scope than my needs. A better name might've been pyxtf3 to differentiate, but seeing as that project seems abandonded this project will most likely supersede that project in time. A reason for creating a completely new project, is that this project is based on ctypes - while the other pyxtf uses the struct parsing module. The motivation was not performance, but personal preference.
-
+Examples can be found in the [examples directory](https://github.com/oysstu/pyxtf/tree/master/examples) on github.
 
 ##### Contribution
-XTF files are not a golden bullet, there are large differences between file versions and vendors. If you find an XTF-file that does not work, either submit a patch or new packet type, or be prepared to send an example XTF-file when submitting the bug-report.
+ If you find an XTF-file that does not work, either submit a patch or new packet type, or be prepared to send an example XTF-file when submitting the bug-report.
 
 

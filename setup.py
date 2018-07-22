@@ -1,5 +1,7 @@
+from os import path
 from setuptools import setup
 from tools.generate_pyi import generate_pyi
+
 
 def main():
     # Generate .pyi files
@@ -8,10 +10,17 @@ def main():
     import pyxtf.vendors.kongsberg
     generate_pyi(pyxtf.vendors.kongsberg)
 
+    # read the contents of README file
+    this_directory = path.abspath(path.dirname(__file__))
+    with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
+        long_description = f.read()
+
     # Run setup script
     setup(name='pyxtf',
-          version='0.1',
+          version='1.0',
           description='eXtended Triton Format (XTF) file interface',
+          long_description=long_description,
+          long_description_content_type='text/markdown',
           author='Oystein Sture',
           author_email='oysstu@gmail.com',
           url='https://github.com/oysstu/pyxtf',
@@ -19,7 +28,7 @@ def main():
           setup_requires=['numpy>=1.11'],
           install_requires=['numpy>=1.11', 'matplotlib>=1.5.1'],
           packages=['pyxtf', 'pyxtf.vendors'],
-          package_data={'':['*.pyi']},
+          package_data={'': ['*.pyi']},
           use_2to3=False,
           classifiers=[
               'License :: OSI Approved :: MIT License',
@@ -28,8 +37,9 @@ def main():
               'Intended Audience :: Science/Research',
               'Natural Language :: English',
               'Topic :: Scientific/Engineering',
-              'Programming Language:: Python:: 3:: Only'
+              'Programming Language :: Python :: 3 :: Only'
           ])
+
 
 if __name__ == '__main__':
     main()
