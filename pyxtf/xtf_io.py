@@ -4,6 +4,7 @@ from itertools import repeat
 from os.path import splitext, isfile
 from typing import Tuple, Any, Dict, Union, Generator, Iterable
 from warnings import warn
+import ctypes
 
 from pyxtf.xtf_ctypes import *
 
@@ -57,7 +58,7 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[
     # Read XTF file
     with open(path, 'rb') as f:
         # Read initial file header
-        file_header = XTFFileHeader(buffer=f)
+        file_header = XTFFileHeader.create_from_buffer(buffer=f)
 
         n_channels = file_header.channel_count()
         if n_channels > 6:
@@ -76,7 +77,7 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[
                 # How to read and construct each type is implemented in the class (default impl. in XTFBase.__new__)
                 p_class = XTFPacketClasses.get(p_headertype, None)
                 if p_class:
-                    p_header = p_class(buffer=f, file_header=file_header)
+                    p_header = p_class.create_from_buffer(buffer=f, file_header=file_header)
                     yield p_header
                 else:
                     warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
@@ -107,7 +108,7 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[
                     # How to read and construct each type is implemented in the class (default impl. in XTFBase.__new__)
                     p_class = XTFPacketClasses.get(p_headertype, None)
                     if p_class:
-                        p_header = p_class(buffer=f, file_header=file_header)
+                        p_header = p_class.create_from_buffer(buffer=f, file_header=file_header)
                         yield p_header
                     else:
                         warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
