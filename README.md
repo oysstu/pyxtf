@@ -18,7 +18,6 @@ python3 setup.py install
 The project depends on setuptools and numpy. Matplotlib is used for plotting, but is not required for basic functionality.
 
 ##### Usage
-Some example XTF-files can be downloaded from the [Triton Imaging Inc.](http://www.tritonimaginginc.com/site/content/public/downloads/DemoFiles/DemoFiles.zip) website.
 
 ```python
 import pyxtf
