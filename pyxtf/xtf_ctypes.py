@@ -541,7 +541,7 @@ class XTFPingHeader(XTFPacketStart):
         if not file_header:
             raise RuntimeError('Initialization of XTFPingHeader from buffer requires file_header to be passed.')
 
-        obj = super().create_from_buffer(buffer)
+        obj = super().create_from_buffer(buffer=buffer)
 
         obj.ping_chan_headers = []  # type: List[XTFPingChanHeader]
         obj.data = None
@@ -550,26 +550,28 @@ class XTFPingHeader(XTFPacketStart):
         if obj.HeaderType == XTFHeaderType.sonar:
             obj.data = []  # type: List[np.ndarray]
 
+            bytes_remaining = obj.NumBytesThisRecord - ctypes.sizeof(XTFPingHeader)
+
             for i in range(0, obj.NumChansToFollow):
                 # Retrieve XTFPingChanHeader for this channel
-                p_chan = XTFPingChanHeader(buffer=buffer)
+                p_chan = XTFPingChanHeader.create_from_buffer(buffer=buffer)
                 obj.ping_chan_headers.append(p_chan)
+                bytes_remaining -= ctypes.sizeof(XTFPingChanHeader)
 
                 # Backwards-compatibility: retrive from NumSamples if possible, else use old field
                 n_samples = p_chan.NumSamples if p_chan.NumSamples > 0 else file_header.sonar_info[i].Reserved
 
                 # Calculate number of bytes to read
                 n_bytes = n_samples * file_header.sonar_info[i].BytesPerSample
-                n_bytes_remaining = obj.NumBytesThisRecord - \
-                                    ctypes.sizeof(XTFPingHeader) - \
-                                    ctypes.sizeof(XTFPingChanHeader)
-                if n_bytes > n_bytes_remaining:
+                if n_bytes > bytes_remaining:
                     raise RuntimeError('Number of bytes to read exceeds the number of bytes remaining in packet.')
 
                 # Read the data and output as a numpy array of the specified bytes-per-sample
-                samples = buffer.read(n_samples * file_header.sonar_info[i].BytesPerSample)
+                samples = buffer.read(n_bytes)
                 if not samples:
                     raise RuntimeError('File ended while reading data packets (file corrupt?)')
+
+                bytes_remaining -= len(samples)
 
                 # Favor getting the sample format from the dedicated field added in X41.
                 # If the field is not populated deduce the type from the bytes per sample field.
@@ -604,7 +606,7 @@ class XTFPingHeader(XTFPacketStart):
             # 7018 water column consists of XTFPingHeader followed by (one?) XTFPingChanHeader, then vendor data
 
             # Retrieve XTFPingChanHeader
-            p_chan = XTFPingChanHeader(buffer=buffer)
+            p_chan = XTFPingChanHeader.create_from_buffer(buffer=buffer)
             obj.ping_chan_headers.append(p_chan)
 
             # Read the data that follows
@@ -738,7 +740,7 @@ class XTFRawCustomHeader(XTFPacket):
 
     @classmethod
     def create_from_buffer(cls, buffer: IOBase, file_header=None):
-        obj = super().create_from_buffer(buffer)
+        obj = super().create_from_buffer(buffer=buffer)
         if obj.MagicNumber != 0xFACE:
             raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
 
@@ -775,7 +777,7 @@ class XTFHeaderNavigation(XTFPacket):
 
     @classmethod
     def create_from_buffer(cls, buffer: IOBase, file_header=None):
-        obj = super().create_from_buffer(buffer)
+        obj = super().create_from_buffer(buffer=buffer)
         if obj.MagicNumber != 0xFACE:
             raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
 
@@ -810,7 +812,7 @@ class XTFHeaderGyro(XTFPacket):
 
     @classmethod
     def create_from_buffer(cls, buffer: IOBase, file_header=None):
-        obj = super().create_from_buffer(buffer)
+        obj = super().create_from_buffer(buffer=buffer)
         if obj.MagicNumber != 0xFACE:
             raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
 
@@ -893,7 +895,7 @@ class SNP0(XTFBase):
 
     @classmethod
     def create_from_buffer(cls, buffer: IOBase, file_header=None):
-        obj = super().create_from_buffer(buffer)
+        obj = super().create_from_buffer(buffer=buffer)
         if obj.ID != 0x534E5030:
             raise RuntimeError('XTF packet does not start with the correct identifier (0x534E5030).')
 
@@ -921,7 +923,7 @@ class SNP1(XTFBase):
 
     @classmethod
     def create_from_buffer(cls, buffer: IOBase, file_header=None):
-        obj = super().create_from_buffer(buffer)
+        obj = super().create_from_buffer(buffer=buffer)
         if obj.ID != 0x534E5031:
             raise RuntimeError('XTF packet does not start with the correct identifier (0x534E5031).')
 
