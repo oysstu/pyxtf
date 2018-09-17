@@ -75,13 +75,20 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[
 
                 # Get the class associated with this header type (if any)
                 # How to read and construct each type is implemented in the class (default impl. in XTFBase.__new__)
-                p_class = XTFPacketClasses.get(p_headertype, None)
-                if p_class:
-                    p_header = p_class.create_from_buffer(buffer=f, file_header=file_header)
-                    yield p_header
-                else:
-                    warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
-                    warn(warning_str)
+                p_class = XTFPacketClasses.get(p_headertype, XTFUnknownPacket)
+                p_header = p_class.create_from_buffer(buffer=f, file_header=file_header)
+
+                # Warn on unknown packets
+                if p_class is XTFUnknownPacket:
+                    try:
+                        p_headertype = XTFHeaderType(p_header.HeaderType)
+                        warning_str = 'XTFHeaderType ({}) has no implementation. Returned as XTFUnknownPacket.'.format(p_headertype.name)
+                        warn(warning_str)
+                    except ValueError:
+                        warning_str = 'XTFHeaderType ({}) is not known. Returned as XTFUnknownPacket'.format(p_header.HeaderType)
+                        warn(warning_str)
+
+                yield p_header
         else:
             # Preallocate, as it is assigned to at every iteration
             p_start = XTFPacketStart()
@@ -100,19 +107,29 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[
                     raise RuntimeError('XTF file shorter than expected while reading packet.')
 
                 # Only return packets that matches types arg (if None, return all)
-                p_headertype = XTFHeaderType(p_start.HeaderType)
+                try:
+                    p_headertype = XTFHeaderType(p_start.HeaderType)
+                except ValueError:
+                    p_headertype = XTFHeaderType.unknown
+
                 if not types or p_headertype in types:
                     f.seek(packet_start_loc)
 
-                    # Get the class associated with this header type (if any)
+                    # Get the class associated with this header type (if any), else use XTFUnknownPacket
                     # How to read and construct each type is implemented in the class (default impl. in XTFBase.__new__)
-                    p_class = XTFPacketClasses.get(p_headertype, None)
-                    if p_class:
-                        p_header = p_class.create_from_buffer(buffer=f, file_header=file_header)
-                        yield p_header
-                    else:
-                        warning_str = 'Unsupported packet type \'{}\' encountered'.format(str(p_headertype))
+                    p_class = XTFPacketClasses.get(p_headertype, XTFUnknownPacket)
+
+                    # Warn on unknown packets or missing implementations
+                    if p_headertype == XTFHeaderType.unknown:
+                        warning_str = 'XTFHeaderType ({}) is not known. Returned as XTFUnknownPacket'.format(p_start.HeaderType)
                         warn(warning_str)
+                    elif p_class is XTFUnknownPacket:
+                        warning_str = 'XTFHeaderType ({}) has no implementation. Returned as XTFUnknownPacket.'.format(p_headertype.name)
+                        warn(warning_str)
+
+                    p_header = p_class.create_from_buffer(buffer=f, file_header=file_header)
+
+                    yield p_header
 
                 # Skip over any data padding before next iteration
                 f.seek(packet_start_loc + p_start.NumBytesThisRecord)
@@ -144,7 +161,10 @@ def xtf_read(path: str, types: List[XTFHeaderType] = None) -> Tuple[XTFFileHeade
     # Loop through XTF packets, sort into dict
     packets = {}  # type: Dict[XTFHeaderType, List[Any]]
     for packet in gen:
-        p_headertype = XTFHeaderType(packet.HeaderType)
+        try:
+            p_headertype = XTFHeaderType(packet.HeaderType)
+        except ValueError:
+            p_headertype = XTFHeaderType.unknown
         try:
             packets[p_headertype].append(packet)
         except KeyError:

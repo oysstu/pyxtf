@@ -322,6 +322,26 @@ class XTFPacketStart(XTFPacket):
         self.HeaderType = XTFHeaderType.user_defined
 
 
+class XTFUnknownPacket(XTFPacketStart):
+    """
+    Class for packets without a known implementation. Any data after the header is returned as bytes
+    Note: If you have documentation for any of these structures, please let me know
+    """
+    def __init__(self):
+        super().__init__()
+        self.data = b''
+
+    @classmethod
+    def create_from_buffer(cls, buffer: IOBase, file_header: XTFFileHeader=None):
+        obj = super().create_from_buffer(buffer)
+
+        n_bytes = obj.NumBytesThisRecord - ctypes.sizeof(cls)
+        obj.data = buffer.read(n_bytes)
+
+        return obj
+
+
+
 class XTFAttitudeData(XTFPacketStart):
     _pack_ = 1
     _fields_ = [
@@ -953,7 +973,8 @@ XTFPacketClasses = {
     XTFHeaderType.navigation: XTFHeaderNavigation,
     XTFHeaderType.gyro: XTFHeaderGyro,
     XTFHeaderType.sourcetime_gyro: XTFHeaderGyro,
-    XTFHeaderType.highspeed_sensor2: XTFHighSpeedSensor
+    XTFHeaderType.highspeed_sensor2: XTFHighSpeedSensor,
+    XTFHeaderType.unknown: XTFUnknownPacket
 }
 
 

@@ -101,10 +101,12 @@ class XTFHeaderType(IntEnum):
     attitude_proc = 103
     singlebeam_proc = 104
     aux_proc = 105                      # Aux channel + aux altitude + magnetometer
+    klein3000_data_page = 106
     pos_raw_navigation = 107
     kleinv4_data_page = 108
     custom_vendor_data = 199
     user_defined = 200
+    unknown = 2**16  # Defined by pyxtf (outside valid uint16 range)
 
 
 class XTFManufacturerID(AutoIntEnum):
