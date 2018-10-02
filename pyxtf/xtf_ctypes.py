@@ -439,13 +439,13 @@ class XTFPingChanHeader(XTFBase):
     _fields_ = [
         ('ChannelNumber', ctypes.c_uint16),
         ('DownsampleMethod', ctypes.c_uint16),
-        ('SlantRange', ctypes.c_float),
-        ('GroundRange', ctypes.c_float),
-        ('TimeDelay', ctypes.c_float),
-        ('TimeDuration', ctypes.c_float),
-        ('SecondsPerPing', ctypes.c_float),
-        ('ProcessingFlags', ctypes.c_uint16),
-        ('Frequency', ctypes.c_uint16),
+        ('SlantRange', ctypes.c_float),             # Slant range [m]
+        ('GroundRange', ctypes.c_float),            # Ground range [m, optional]
+        ('TimeDelay', ctypes.c_float),              # Delay from transmit to recording started [s]
+        ('TimeDuration', ctypes.c_float),           # Duration of recording [s]
+        ('SecondsPerPing', ctypes.c_float),         # Time between pings [s]
+        ('ProcessingFlags', ctypes.c_uint16),       # See enumeration
+        ('Frequency', ctypes.c_uint16),             # Center transmit frequency
         ('InitialGainCode', ctypes.c_uint16),
         ('GainCode', ctypes.c_uint16),
         ('BandWidth', ctypes.c_uint16),
@@ -453,13 +453,13 @@ class XTFPingChanHeader(XTFBase):
         ('ContactClassification', ctypes.c_uint16),
         ('ContactSubNumber', ctypes.c_uint8),
         ('ContactType', ctypes.c_uint8),
-        ('NumSamples', ctypes.c_uint32),  # This defines the number of samples to follow
+        ('NumSamples', ctypes.c_uint32),            # Number of samples following header
         ('MillivoltScale', ctypes.c_uint16),
         ('ContactTimeOffTrack', ctypes.c_float),
         ('ContactCloseNumber', ctypes.c_uint8),
         ('Reserved2', ctypes.c_uint8),
         ('FixedVSOP', ctypes.c_float),
-        ('Weight', ctypes.c_int16),
+        ('Weight', ctypes.c_int16),                 # Weight factor
         ('ReservedSpace', ctypes.c_uint8 * 4)
     ]
 
