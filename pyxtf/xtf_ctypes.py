@@ -439,7 +439,7 @@ class XTFPingChanHeader(XTFBase):
     _fields_ = [
         ('ChannelNumber', ctypes.c_uint16),
         ('DownsampleMethod', ctypes.c_uint16),
-        ('SlandRange', ctypes.c_float),
+        ('SlantRange', ctypes.c_float),
         ('GroundRange', ctypes.c_float),
         ('TimeDelay', ctypes.c_float),
         ('TimeDuration', ctypes.c_float),
