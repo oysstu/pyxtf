@@ -36,6 +36,9 @@ class AutoIntEnum(IntEnum):
 
 @unique
 class XTFChannelType(AutoIntEnum):
+    """
+    TypeOfChannel enumeration in XTFChanInfo
+    """
     subbottom = ()
     port = ()
     stbd = ()
@@ -43,13 +46,24 @@ class XTFChannelType(AutoIntEnum):
 
 @unique
 class XTFNavUnits(IntEnum):
+    """
+    NavUnits enumeration in XTFFileHeader
+    """
     meters = 0
     latlon = 3
 
 @unique
+class XTFCorrectionFlags(IntEnum):
+    """
+    CorrectionFlags enumeration in XTFChanInfo
+    """
+    slant_range = 1
+    ground_range = 2
+
+@unique
 class XTFHeaderType(IntEnum):
     """
-    The types of headers.
+    HeaderType enumeration in XTFPingHeader
     """
     sonar = 0                           # Sidescan and subbottom-profiler
     notes = 1                           # Text notes
@@ -108,8 +122,28 @@ class XTFHeaderType(IntEnum):
     user_defined = 200
     unknown = 2**16  # Defined by pyxtf (outside valid uint16 range)
 
+@unique
+class XTFDownsampleMethod(IntEnum):
+    """
+    DownsampleMethod enumeration in XTFPingChanHeader
+    """
+    max = 2
+    rms = 4
+
+@unique
+class XTFProcessingFlags(IntEnum):
+    """
+    ProcessingFlags enumeration in XTFPingChanHeader
+    """
+    tvg = 4
+    bac_gac = 8
+    filter = 16
+
 
 class XTFManufacturerID(AutoIntEnum):
+    """
+    ManufacturerID enumeration in XTFRawCustomHeader
+    """
     unknown = ()
     benthos = ()
     reson = ()
@@ -125,6 +159,9 @@ class XTFManufacturerID(AutoIntEnum):
 
 
 class XTFSonarType(AutoIntEnum):
+    """
+    SonarType enumeration in XTFFileHeader
+    """
     none = ()
     jamstec = ()
     analog_c31 = ()
@@ -201,7 +238,7 @@ class XTFSonarType(AutoIntEnum):
 @unique
 class XTFSampleFormat(IntEnum):
     """
-    Used in the ChanInfo structures
+    SampleFormat enumeration in XTFChanInfo
     """
     legacy = 0
     ibm_float = 1
