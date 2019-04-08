@@ -90,6 +90,8 @@ for i in range(10):
     sz += len(d0) + len(d1)
     p.NumBytesThisRecord = sz
 
+    pings.append(p)
+
 #
 # Write to file
 #
