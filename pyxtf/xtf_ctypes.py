@@ -595,12 +595,12 @@ class XTFPingHeader(XTFPacketStart):
 
                 # Favor getting the sample format from the dedicated field added in X41.
                 # If the field is not populated deduce the type from the bytes per sample field.
-                if file_header.sonar_info[i].SampleFormat in sample_format_dtype:
-                    sample_format = sample_format_dtype[file_header.sonar_info[i].SampleFormat]
-                else:
-                    sample_format = xtf_dtype[file_header.sonar_info[i].BytesPerSample]
+                try:
+                    sample_dtype = sample_format_dtype[file_header.sonar_info[i].SampleFormat]
+                except KeyError:
+                    sample_dtype = xtf_dtype[file_header.sonar_info[i].BytesPerSample]
 
-                samples = np.frombuffer(samples, dtype=sample_format)
+                samples = np.frombuffer(samples, dtype=sample_dtype)
                 obj.data.append(samples)
 
         elif obj.HeaderType == XTFHeaderType.bathy_xyza:
