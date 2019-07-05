@@ -101,6 +101,7 @@ class XTFHeaderType(IntEnum):
     reson_7125_snippet = 62            # 7125 Bathy data snippets
     qinsy_r2sonic_bathy = 65            # QINSy R2Sonic bathy data
     qinsy_r2sonic_fts = 66              # QINSy R2Sonic bathy footprint time series (snippets)
+    r2sonic_truepix = 67                # R2Sonic truepix data
     r2sonic_bathy = 68                  # Triton R2Sonic bathy data
     r2sonic_fts = 69                    # Triton R2sonic footprint time series
     coda_echoscope_data = 70            # Custom CODA Echoscope data
