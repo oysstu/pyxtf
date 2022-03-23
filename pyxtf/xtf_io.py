@@ -61,8 +61,8 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[
         file_header = XTFFileHeader.create_from_buffer(buffer=f)
 
         n_channels = file_header.channel_count()
-        if n_channels > 6:
-            raise NotImplementedError("Support for more than 6 channels not implemented.")
+        #if n_channels > 6:
+        #    raise NotImplementedError("Support for more than 6 channels not implemented.")
 
         # Return the file header before starting packet iteration
         yield file_header

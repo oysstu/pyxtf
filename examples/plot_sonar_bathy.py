@@ -1,6 +1,8 @@
+from ast import List
 import numpy as np
 import matplotlib.pyplot as plt
 from pyxtf import xtf_read, concatenate_channel, XTFHeaderType
+from pyxtf.xtf_ctypes import XTFAttitudeData, XTFHeaderNavigation
 
 
 # Read file header and packets

@@ -563,12 +563,12 @@ class XTFPingHeader(XTFPacketStart):
 
         obj = super().create_from_buffer(buffer=buffer)
 
-        obj.ping_chan_headers = []  # type: List[XTFPingChanHeader]
+        obj.ping_chan_headers = []  ## type: List[XTFPingChanHeader]
         obj.data = None
 
         # Sonar and bathy has a different data structure following the header
         if obj.HeaderType == XTFHeaderType.sonar:
-            obj.data = []  # type: List[np.ndarray]
+            obj.data = []  ## type: List[np.ndarray]
 
             bytes_remaining = obj.NumBytesThisRecord - ctypes.sizeof(XTFPingHeader)
 
