@@ -1,16 +1,25 @@
-from sympy import N, false
+#from sympy import N, false
 import numpy as np
 import os
 
+w = 5
+h_total = 16
 
-dir = "test"
-if not os.path.isdir(dir):
-    os.mkdir(dir)
+t_left = (h_total,w,3)
+h_steps = h_total // w
 
-for file in os.listdir():
-    if file.endswith(".xtf"):
-        print(file)
+A = np.arange(h_total)
 
-colour = [1, 1, 31]/2
 
-print(colour[2])
+for i in range(0,h_total,w):
+    print(A[i:i+w])
+
+
+
+
+# Slump = np.random.randint(0,10,t_left)
+
+
+
+# print(Slump)
+# print(Slump[:2])
