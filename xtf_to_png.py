@@ -6,12 +6,11 @@ from PIL import Image
 
 
 def generate_pngs(input_file):
-    #input_file = 'testfil.xtf'
     (file_header, packets) = pyxtf.xtf_read(input_file)
 
     # Retrieve a list of all sonar packets
     sonar_packets = packets[pyxtf.XTFHeaderType.sonar]
-    # Declared the Width and Height of a sidescan image
+    # The Width and Height of a sidescan image
     w1 = np.size(sonar_packets[0].data[0])
     w2 = np.size(sonar_packets[0].data[1])
     h_total = len(sonar_packets)
@@ -21,8 +20,9 @@ def generate_pngs(input_file):
     # To store pixels
     t = (h, w1+w2, 3)
     # RGB colours of the printout
-    colour = (1, 0.8, 0.5)
-    # Scale all colours equaly
+    #colour = (1, 0.8, 0.5)
+    colour = (1, 1, 1)
+    # Scale pixel intensity
     scale = 1
 
     """
@@ -65,6 +65,11 @@ def generate_pngs(input_file):
 
     return
 
+"""
+# Go through all files in current directory.
 for file in os.listdir():
+    # I files is xtf, generate png's from it.
     if file.endswith(".xtf"):
         generate_pngs(file)
+"""
+generate_pngs("testfil.xtf")

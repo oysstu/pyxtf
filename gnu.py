@@ -7,6 +7,10 @@ dir = "test"
 if not os.path.isdir(dir):
     os.mkdir(dir)
 
-for name in os.listdir():
-    if name.endswith(".xtf"):
-        print(name)
+for file in os.listdir():
+    if file.endswith(".xtf"):
+        print(file)
+
+colour = [1, 1, 31]/2
+
+print(colour[2])
