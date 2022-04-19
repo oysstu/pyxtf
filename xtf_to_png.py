@@ -7,6 +7,7 @@ from PIL import Image
 
 
 def generate_pngs(input_file):
+    print("Generating PNGs from " + input_file)
     (file_header, packets) = pyxtf.xtf_read(input_file)
 
     # Retrieve a list of all sonar packets
@@ -15,7 +16,7 @@ def generate_pngs(input_file):
     w1 = np.size(sonar_packets[0].data[0])
     w2 = np.size(sonar_packets[0].data[1])
     h_total = len(sonar_packets)
-    #h_total = 1500
+    #h_total = 1250
 
     # Height of devided image sections
     h = w1
@@ -28,11 +29,13 @@ def generate_pngs(input_file):
     # Scale pixel intensity
     scale = 1
 
+    input_file = input_file.split(os.path.sep)[-1]
 
 
-    dir = "Generated PNGs"
-    if not os.path.isdir(dir):
-        os.mkdir(dir)
+
+    png_dir = "Generated PNGs"
+    if not os.path.isdir(png_dir):
+        os.mkdir(png_dir)
 
 
     # Creates all Zeros Datatype Unsigned Integer
@@ -49,11 +52,32 @@ def generate_pngs(input_file):
             # Assigning Colors to Each Pixel
             Right[i, j] = [pix*colour[0], pix*colour[1], pix*colour[2]]
 
-    for k in range(0,h_total,w1):
-        img_left = Image.fromarray(Left[k:k+w1], "RGB")
-        img_left.save(dir + "/" + input_file + "_" + str(k//h) + "_left.png")
-        img_right = Image.fromarray(Right[k:k+w1], "RGB")
-        img_right.save(dir + "/" + input_file + "_" + str(k//h) + "_right.png")
+    # See if last image will be too wide compared to its height
+    if h_total % w1 > w1*0.5:
+        # Height is more than half of width
+        for k in range(0,h_total,w1):
+            img_left = Image.fromarray(Left[k:k+w1], "RGB")
+            filename_left = input_file + "_" + str(k//h) + "_left.png"
+            img_left.save(os.path.join(png_dir,filename_left))
+            img_right = Image.fromarray(Right[k:k+w1], "RGB")
+            filename_right = input_file + "_" + str(k//h) + "_right.png"
+            img_right.save(os.path.join(png_dir,filename_right))
+    else:
+        # Height is less than half of width. Merge last image with second to last
+        for k in range(0,h_total-w1,w1):
+            img_left = Image.fromarray(Left[k:k+w1], "RGB")
+            filename_left = input_file + "_" + str(k//h) + "_left.png"
+            img_left.save(os.path.join(png_dir,filename_left))
+            img_right = Image.fromarray(Right[k:k+w1], "RGB")
+            filename_right = input_file + "_" + str(k//h) + "_right.png"
+            img_right.save(os.path.join(png_dir,filename_right))
+        img_left = Image.fromarray(Left[k:k+2*w1], "RGB")
+        filename_left = input_file + "_" + str(k//h) + "_left.png"
+        img_left.save(os.path.join(png_dir,filename_left))
+        img_right = Image.fromarray(Right[k:k+2*w1], "RGB")
+        filename_right = input_file + "_" + str(k//h) + "_right.png"
+        img_right.save(os.path.join(png_dir,filename_right))
+
 
 
         # img.show()
@@ -61,11 +85,17 @@ def generate_pngs(input_file):
 
     return
 
-"""
-# Go through all files in current directory.
-for file in os.listdir():
-    # I files is xtf, generate png's from it.
+xtf_dir = "XTF files"
+if not os.path.isdir(xtf_dir):
+    os.mkdir(xtf_dir)
+
+# Go through all files in directory xtf_dir.
+for file in os.listdir(xtf_dir):
+    # If file is xtf, generate png's from it.
     if file.endswith(".xtf"):
-        generate_pngs(file)
-"""
-generate_pngs("testfil.xtf")
+        generate_pngs(os.path.join(xtf_dir,file))
+
+
+
+
+#generate_pngs("testfil.xtf")
