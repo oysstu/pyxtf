@@ -1,5 +1,7 @@
 # Ignorera genererade bilder
 *.png
+*.xtf
+*.pyxtf_idx
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
