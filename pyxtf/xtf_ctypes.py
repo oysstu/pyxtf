@@ -1,12 +1,14 @@
 import ctypes
 from datetime import date
-from io import IOBase, BytesIO
+from io import BytesIO
+from io import IOBase
+import itertools
 from typing import List
-import numpy as np
 from warnings import warn
 
-from pyxtf.enumerations import *
+import numpy as np
 
+from pyxtf.enumerations import *
 
 # General notes from the XTF format document (rev35)
 # 1. All structures should be zero-filled before use.
@@ -124,6 +126,9 @@ class XTFBase(ctypes.LittleEndianStructure):
         out = ''.join(field[1] for field in fields)
 
         return out
+
+    def to_bytes(self):
+        return bytes(self)
 
 
 class XTFChanInfo(XTFBase):
@@ -652,6 +657,13 @@ class XTFPingHeader(XTFPacketStart):
     def __init__(self):
         super().__init__()
         self.HeaderType = XTFHeaderType.sonar.value
+
+    def to_bytes(self):
+        return b''.join(
+            map(bytes,
+                itertools.chain((self,),
+                itertools.chain.from_iterable(
+                    zip(self.ping_chan_headers, self.data)))))
 
 
 class XTFPosRawNavigation(XTFPacketStart):
