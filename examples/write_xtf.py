@@ -3,14 +3,19 @@ Example of how to write an XTF file from other source.
 All fields that are marked as required in the XTF spec are filled with a value.
 """
 
-import pyxtf
-import datetime
-import numpy as np
 import ctypes
+import datetime
+
+import numpy as np
+
+import pyxtf
 
 #
 # Setup dummy data
 #
+
+num_pings = 20
+num_samples_per_ping = 100
 
 # Note: Enum to ctype conversion
 #       must either append .value or cast to int (even though it derives from IntEnum)
@@ -36,7 +41,7 @@ fh.ChanInfo[1].SampleFormat = pyxtf.XTFSampleFormat.byte.value
 
 # Create fake pings
 pings = []
-for i in range(10):
+for i in range(num_pings):
     t = datetime.datetime.now()
 
     p = pyxtf.XTFPingHeader()
@@ -66,22 +71,21 @@ for i in range(10):
     p.SensorHeading = 45
 
     # Setup ping chan headers
-    n_samp = 20
     c = (pyxtf.XTFPingChanHeader(), pyxtf.XTFPingChanHeader())
     c[0].ChannelNumber = 0
-    c[0].SlandRange = 30
+    c[0].SlantRange = 30
     c[0].Frequency = 340
-    c[0].NumSamples = n_samp
+    c[0].NumSamples = num_samples_per_ping
     c[1].ChannelNumber = 1
-    c[1].SlandRange = 30
+    c[1].SlantRange = 30
     c[1].Frequency = 340
-    c[1].NumSamples = n_samp
+    c[1].NumSamples = num_samples_per_ping
 
     p.ping_chan_headers = c
 
     # Data
-    d0 = np.arange(0, n_samp, 1, dtype=np.uint8)*(i+1)
-    d1 = np.arange(n_samp, 0, -1, dtype=np.uint8)*(i+1)
+    d0 = np.arange(0, num_samples_per_ping, dtype=np.uint8)*(i+1)
+    d1 = d0[::-1]
     p.data = [d0, d1]
 
     # Set packet size
@@ -98,19 +102,7 @@ for i in range(10):
 
 with open('test.xtf', 'wb') as f:
     # Write file header
-    f.write(bytes(fh))
+    f.write(fh.to_bytes())
 
     for p in pings:
-        f.write(bytes(p))
-
-        # Write ping channel headers and data
-        # TODO: Make __bytes__ do this automatically for XTFPingHeader
-        for c, d in zip(p.ping_chan_headers, p.data):
-            f.write(bytes(c))
-            f.write(bytes(d))
-
-
-
-
-
-
+        f.write(p.to_bytes())
