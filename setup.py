@@ -1,5 +1,7 @@
 from os import path
+
 from setuptools import setup
+
 from tools.generate_pyi import generate_pyi
 
 
@@ -17,7 +19,7 @@ def main():
 
     # Run setup script
     setup(name='pyxtf',
-          version='1.2',
+          version='1.3.0',
           description='eXtended Triton Format (XTF) file interface',
           long_description=long_description,
           long_description_content_type='text/markdown',
