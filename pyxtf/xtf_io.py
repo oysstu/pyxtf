@@ -1,11 +1,13 @@
-import pickle
+import ctypes
 from heapq import merge  # Used to merge sorted lists (file pos)
 from itertools import repeat
-from os.path import splitext, isfile
-from typing import Tuple, Any, Dict, Union, Generator, Iterable
+from os.path import isfile
+from os.path import splitext
+import pickle
+from typing import Any, Dict, Generator, Iterable, List, Tuple, Union
 from warnings import warn
-import ctypes
 
+from pyxtf.enumerations import XTFHeaderType
 from pyxtf.xtf_ctypes import *
 
 
@@ -37,12 +39,13 @@ def xtf_idx_pos_iter(
     return merge(*xtf_idx_iters)
 
 
-def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[
-    Union[XTFFileHeader, XTFPacket], None, None]:
+def xtf_read_gen(path: str, types: List[XTFHeaderType]=None, save_index=False) \
+                -> Generator[Union[XTFFileHeader, XTFPacket], None, None]:
     """
     Generator object which iterates over the XTF file, return first the file header and then subsequent packets
     :param path: The path to the XTF file
     :param types: Optional list of XTFHeaderTypes to keep. Default (None) returns all types. Can improve performance
+    :param save_index: If true, an index file is stored next to the xtf file, improving performance of repeated reads significantly.
     :return: None
     """
     # Read index file if it exists
@@ -135,14 +138,16 @@ def xtf_read_gen(path: str, types: List[XTFHeaderType] = None) -> Generator[
                 f.seek(packet_start_loc + p_start.NumBytesThisRecord)
 
                 # Store index file information
-                try:
-                    xtf_idx[p_headertype].append(packet_start_loc)
-                except KeyError:
-                    xtf_idx[p_headertype] = [packet_start_loc]
+                if save_index:
+                    try:
+                        xtf_idx[p_headertype].append(packet_start_loc)
+                    except KeyError:
+                        xtf_idx[p_headertype] = [packet_start_loc]
 
-            # Pickle index file
-            with open(path_idx, mode='wb') as f_idx:
-                pickle.dump(xtf_idx, f_idx)
+            if save_index:
+                # Pickle index file
+                with open(path_idx, mode='wb') as f_idx:
+                    pickle.dump(xtf_idx, f_idx)
 
         return
 
