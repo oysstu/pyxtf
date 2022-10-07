@@ -2,6 +2,8 @@
 *.png
 *.xtf
 *.pyxtf_idx
+*.mosaic
+Sidescans.rar
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
