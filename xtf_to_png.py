@@ -19,7 +19,7 @@ def generate_pngs(input_file):
     #h_total = 1250
 
     # Height of devided image sections
-    h = w1
+    img_height = w1
     # To store pixels
     t_left = (h_total, w1, 3)
     t_right = (h_total, w2, 3)
@@ -57,32 +57,32 @@ def generate_pngs(input_file):
         # Height is more than half of width
         for k in range(0,h_total,w1):
             img_left = Image.fromarray(Left[k:k+w1], "RGB")
-            filename_left = input_file + "_" + str(k//h) + "_left.png"
+            filename_left = input_file + "_" + str(k//img_height).zfill(4) + "_left.png"
             img_left.save(os.path.join(png_dir,filename_left))
             img_right = Image.fromarray(Right[k:k+w1], "RGB")
-            filename_right = input_file + "_" + str(k//h) + "_right.png"
+            filename_right = input_file + "_" + str(k//img_height).zfill(4) + "_right.png"
             img_right.save(os.path.join(png_dir,filename_right))
     else:
         # Height is less than half of width. Merge last image with second to last
+        # Save all but last image.
         for k in range(0,h_total-w1,w1):
             img_left = Image.fromarray(Left[k:k+w1], "RGB")
-            filename_left = input_file + "_" + str(k//h) + "_left.png"
+            filename_left = input_file + "_" + str(k//img_height).zfill(4) + "_left.png"
             img_left.save(os.path.join(png_dir,filename_left))
             img_right = Image.fromarray(Right[k:k+w1], "RGB")
-            filename_right = input_file + "_" + str(k//h) + "_right.png"
+            filename_right = input_file + "_" + str(k//img_height).zfill(4) + "_right.png"
             img_right.save(os.path.join(png_dir,filename_right))
+        # Save last image.
         img_left = Image.fromarray(Left[k:k+2*w1], "RGB")
-        filename_left = input_file + "_" + str(k//h) + "_left.png"
+        filename_left = input_file + "_" + str(k//img_height).zfill(4) + "_left.png"
         img_left.save(os.path.join(png_dir,filename_left))
         img_right = Image.fromarray(Right[k:k+2*w1], "RGB")
-        filename_right = input_file + "_" + str(k//h) + "_right.png"
+        filename_right = input_file + "_" + str(k//img_height).zfill(4) + "_right.png"
         img_right.save(os.path.join(png_dir,filename_right))
 
 
 
         # img.show()
-
-
     return
 
 xtf_dir = "XTF files"

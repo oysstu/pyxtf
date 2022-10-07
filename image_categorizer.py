@@ -10,8 +10,9 @@ from PIL import Image
 
 pygame.init()
 
-#sort_dir = "Generated PNGs"
-sort_dir = "Test PNGs"
+sort_dir = "Generated PNGs"
+#sort_dir = "Test PNGs"
+#sort_dir = "Sidescans/Rocks"
 
 dir = sort_dir
 if not os.path.isdir(dir):
@@ -33,16 +34,22 @@ for i in range(len(png_list)):
     png_list[i] = os.path.join(sort_dir,png_list[i])
 
 info = pygame.display.Info()
-screen_width,screen_height = info.current_w,info.current_h
+#screen_size = (info.current_w, info.current_h)
+screen_size = (1700,1300)
+
+
 img_size = (1200, 1200)
-img_upper_left_h = screen_height/2-img_size[1]/2
-img_upper_left_w = screen_width/2-img_size[0]/2
+img_upper_left_h = screen_size[1]/2-img_size[1]/2
+img_upper_left_w = screen_size[0]/2-img_size[0]/2
 
 img_upper_left_h = (img_upper_left_h+abs(img_upper_left_h))/2
 img_upper_left_w = (img_upper_left_w+abs(img_upper_left_w))/2
 
 img_upper_left = (img_upper_left_w,img_upper_left_h)
 
+font = pygame.font.SysFont('Garamond', 20)
+text_colour = (200, 200, 200)
+#textsurface = font.render('Some Text', False, text_colour)
 
 running = True
 img_number = 0
@@ -53,8 +60,14 @@ def draw_image(file):
     #if file.endswith(".png"):
     picture = pygame.image.load(file)
     picture = pygame.transform.scale(picture, img_size)
-    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+#    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    screen = pygame.display.set_mode(screen_size, pygame.RESIZABLE)
+    textsurface = font.render(file, False, text_colour)
+    screen.blit(textsurface,(300, 10))
     screen.blit(picture, img_upper_left)
+    pygame.display.update()
+    #pygame.display.flip()
+
 
 def move_to_category(category, file):
     #shutil.move(file,os.path.join(sort_dir,category))
@@ -64,6 +77,7 @@ while running:
 
     if img_number == len(png_list):
         running = False
+
 
     # it's important to get all events from the 
     # event queue; otherwise it may get stuck
@@ -82,8 +96,9 @@ while running:
                 cat_B_sorted+=1
             if event.key == pygame.K_ESCAPE:
                 running = False
+
         
-    pygame.display.update()
+#    pygame.display.update()
 
 print("=========================================")
 print("%d images sorted. %d in category A and %d in category B." % 
@@ -91,7 +106,9 @@ print("%d images sorted. %d in category A and %d in category B." %
 
 tot_A_sorted = len(os.listdir(os.path.join(sort_dir,Cat_A)))
 tot_B_sorted = len(os.listdir(os.path.join(sort_dir,Cat_B)))
+to_be_sorted = len(os.listdir(sort_dir))
 
-print("Total sorted in A: %d. Total sorted in B: %d." % (tot_A_sorted, tot_B_sorted))
+print("Total sorted in A: %d. Total sorted in B: %d. Left to be sorted: %d." 
+    % (tot_A_sorted, tot_B_sorted, to_be_sorted))
 print("=========================================")
 
