@@ -2,16 +2,8 @@ from os import path
 
 from setuptools import setup
 
-from tools.generate_pyi import generate_pyi
-
 
 def main():
-    # Generate .pyi files
-    import pyxtf.xtf_ctypes
-    generate_pyi(pyxtf.xtf_ctypes)
-    import pyxtf.vendors.kongsberg
-    generate_pyi(pyxtf.vendors.kongsberg)
-
     # read the contents of README file
     this_directory = path.abspath(path.dirname(__file__))
     with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
@@ -19,7 +11,7 @@ def main():
 
     # Run setup script
     setup(name='pyxtf',
-          version='1.3.1',
+          version='1.3.2',
           description='eXtended Triton Format (XTF) file interface',
           long_description=long_description,
           long_description_content_type='text/markdown',

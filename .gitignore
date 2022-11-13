@@ -66,6 +66,3 @@ target/
 
 # Data folder
 data
-
-# Ignore .pyi files, as they are generated automatically by setup.py
-*.pyi
