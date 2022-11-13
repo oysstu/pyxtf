@@ -19,18 +19,23 @@ def main():
 
     # Run setup script
     setup(name='pyxtf',
-          version='1.3.0',
+          version='1.3.1',
           description='eXtended Triton Format (XTF) file interface',
           long_description=long_description,
           long_description_content_type='text/markdown',
           author='Oystein Sture',
           author_email='oysstu@gmail.com',
           url='https://github.com/oysstu/pyxtf',
+          project_urls={
+            "Bug Tracker": "https://github.com/oysstu/pyxtf/issues",
+          },
           license='MIT',
           setup_requires=['numpy>=1.11'],
-          install_requires=['numpy>=1.11', 'matplotlib>=1.5.1'],
+          install_requires=['numpy>=1.11'],
+          extras_require={'Plotting': ['matplotlib>=1.5.1']},
           packages=['pyxtf', 'pyxtf.vendors'],
           package_data={'': ['*.pyi']},
+          include_package_data=True,
           use_2to3=False,
           classifiers=[
               'License :: OSI Approved :: MIT License',

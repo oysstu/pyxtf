@@ -1,0 +1,13 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "numpy",
+]
+
+[tool.poetry]
+packages = [
+    { include = "tools" },
+]
+
+
+build-backend = "setuptools.build_meta"
