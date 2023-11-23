@@ -593,7 +593,7 @@ class XTFPingHeader(XTFPacketStart):
 
                 # Read the data and output as a numpy array of the specified bytes-per-sample
                 samples = buffer.read(n_bytes)
-                if not samples:
+                if n_bytes and not samples:
                     raise RuntimeError('File ended while reading data packets (file corrupt?)')
 
                 bytes_remaining -= len(samples)
