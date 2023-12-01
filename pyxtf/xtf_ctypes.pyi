@@ -649,41 +649,41 @@ class XTFRawCustomHeader(XTFPacket):
     PacketID = None  # type: CField
     Reserved1 = None  # type: CField
     NumBytesThisRecord = None  # type: CField
-    Id = None  # type: CField
-    SoundVelocity = None  # type: CField
-    Intensity = None  # type: CField
-    Quality = None  # type: CField
-    TwoWayTravelTime = None  # type: CField
     Year = None  # type: CField
     Month = None  # type: CField
     Day = None  # type: CField
     Hour = None  # type: CField
     Minute = None  # type: CField
     Second = None  # type: CField
-    Millisecond = None  # type: CField
+    HSecond = None  # type: CField
+    JulianDay = None  # type: CField
     Reserved2 = None  # type: CField
+    PingNumber = None  # type: CField
+    TimeTag = None  # type: CField
+    NumCustomerBytes = None  # type: CField
+    Reserved3 = None  # type: CField
 
     def __init__(self):
         self.MagicNumber = None  # type: ctypes.c_ushort
         self.HeaderType = None  # type: ctypes.c_ubyte
         self.ManufacturerID = None  # type: ctypes.c_ubyte
         self.SonarID = None  # type: ctypes.c_ushort
-        self.PacketID = None  # type: ctypes.Array[ctypes.c_ushort]
-        self.Reserved1 = None  # type: ctypes.c_uint
+        self.PacketID = None  # type: ctypes.c_ushort
+        self.Reserved1 = None  # type: ctypes.Array[ctypes.c_ushort]
         self.NumBytesThisRecord = None  # type: ctypes.c_uint
-        self.Id = None  # type: ctypes.c_int
-        self.SoundVelocity = None  # type: ctypes.c_float
-        self.Intensity = None  # type: ctypes.c_float
-        self.Quality = None  # type: ctypes.c_int
-        self.TwoWayTravelTime = None  # type: ctypes.c_float
         self.Year = None  # type: ctypes.c_ushort
         self.Month = None  # type: ctypes.c_ubyte
         self.Day = None  # type: ctypes.c_ubyte
         self.Hour = None  # type: ctypes.c_ubyte
         self.Minute = None  # type: ctypes.c_ubyte
         self.Second = None  # type: ctypes.c_ubyte
-        self.Millisecond = None  # type: ctypes.c_ushort
-        self.Reserved2 = None  # type: ctypes.Array[ctypes.c_ubyte]
+        self.HSecond = None  # type: ctypes.c_ubyte
+        self.JulianDay = None  # type: ctypes.c_ushort
+        self.Reserved2 = None  # type: ctypes.Array[ctypes.c_ushort]
+        self.PingNumber = None  # type: ctypes.c_uint
+        self.TimeTag = None  # type: ctypes.c_uint
+        self.NumCustomerBytes = None  # type: ctypes.c_uint
+        self.Reserved3 = None  # type: ctypes.Array[ctypes.c_ubyte]
     def get_time(self):
         pass
     def to_bytes(self):
