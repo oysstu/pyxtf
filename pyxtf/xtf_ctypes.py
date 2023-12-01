@@ -752,22 +752,22 @@ class XTFRawCustomHeader(XTFPacket):
         ('HeaderType', ctypes.c_uint8),
         ('ManufacturerID', ctypes.c_uint8),
         ('SonarID', ctypes.c_uint16),
-        ('PacketID', ctypes.c_uint16 * 2),
-        ('Reserved1', ctypes.c_uint32),
+        ('PacketID', ctypes.c_uint16),
+        ('Reserved1', ctypes.c_uint16 * 1),
         ('NumBytesThisRecord', ctypes.c_uint32),
-        ('Id', ctypes.c_int32),
-        ('SoundVelocity', ctypes.c_float),
-        ('Intensity', ctypes.c_float),
-        ('Quality', ctypes.c_int32),
-        ('TwoWayTravelTime', ctypes.c_float),
         ('Year', ctypes.c_uint16),
         ('Month', ctypes.c_uint8),
         ('Day', ctypes.c_uint8),
         ('Hour', ctypes.c_uint8),
         ('Minute', ctypes.c_uint8),
         ('Second', ctypes.c_uint8),
-        ('Millisecond', ctypes.c_uint16),
-        ('Reserved2', ctypes.c_uint8 * 7)
+        ('HSecond', ctypes.c_uint8),
+        ('JulianDay', ctypes.c_uint16),
+        ('Reserved2', ctypes.c_uint16 * 2),
+        ('PingNumber', ctypes.c_uint32),
+        ('TimeTag', ctypes.c_uint32),
+        ('NumCustomerBytes', ctypes.c_uint32),
+        ('Reserved3', ctypes.c_uint8 * 24),
     ]
 
     @classmethod
@@ -776,10 +776,14 @@ class XTFRawCustomHeader(XTFPacket):
         if obj.MagicNumber != 0xFACE:
             raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
 
+        n_bytes = obj.NumBytesThisRecord - ctypes.sizeof(cls)
+        obj.data = buffer.read(n_bytes)
+
         return obj
 
     def __init__(self):
         super().__init__()
+        self.data = b''
         self.MagicNumber = 0xFACE
         self.HeaderType = XTFHeaderType.custom_vendor_data.value
 
