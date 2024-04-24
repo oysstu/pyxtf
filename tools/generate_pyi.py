@@ -68,7 +68,8 @@ def generate_pyi(module):
     # Retrieve classes that derive from ctypes.Structure
     c_structs = ctype_struct_generator(module)
 
-    pyi_path = os.path.splitext(module.__file__)[0] + '.pyi'
+    pyi_path = os.path.splitext(os.path.split(module.__file__)[-1])[0] + '.pyi'
+    print('Generating: ', pyi_path)
     with open(pyi_path, 'w') as f:
         # Write imports
         f.writelines([

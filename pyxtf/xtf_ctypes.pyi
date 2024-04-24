@@ -622,9 +622,8 @@ class XTFQPSMBEEntry(XTFBase):
     Quality = None  # type: CField
     TwoWayTravelTime = None  # type: CField
     DeltaTime = None  # type: CField
-    OffsetX = None  # type: CField
-    OffsetY = None  # type: CField
-    OffsetZ = None  # type: CField
+    BeamAngle = None  # type: CField
+    TiltAngle = None  # type: CField
     Reserved = None  # type: CField
 
     def __init__(self):
@@ -633,9 +632,8 @@ class XTFQPSMBEEntry(XTFBase):
         self.Quality = None  # type: ctypes.c_int
         self.TwoWayTravelTime = None  # type: ctypes.c_double
         self.DeltaTime = None  # type: ctypes.c_double
-        self.OffsetX = None  # type: ctypes.c_double
-        self.OffsetY = None  # type: ctypes.c_double
-        self.OffsetZ = None  # type: ctypes.c_double
+        self.BeamAngle = None  # type: ctypes.c_double
+        self.TiltAngle = None  # type: ctypes.c_double
         self.Reserved = None  # type: ctypes.Array[ctypes.c_float]
     def to_bytes(self):
         pass
