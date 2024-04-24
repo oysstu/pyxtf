@@ -738,9 +738,8 @@ class XTFQPSMBEEntry(XTFBase):
         ('Quality', ctypes.c_int),
         ('TwoWayTravelTime', ctypes.c_double),
         ('DeltaTime', ctypes.c_double),
-        ('OffsetX', ctypes.c_double),  # Number of bytes without padding (header+data)
-        ('OffsetY', ctypes.c_double),
-        ('OffsetZ', ctypes.c_double),
+        ('BeamAngle', ctypes.c_double),
+        ('TiltAngle', ctypes.c_double),
         ('Reserved', ctypes.c_float * 4)
     ]
 
