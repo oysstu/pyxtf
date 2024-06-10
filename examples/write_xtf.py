@@ -76,10 +76,12 @@ for i in range(num_pings):
     c[0].SlantRange = 30
     c[0].Frequency = 340
     c[0].NumSamples = num_samples_per_ping
+    c[0].SampleFormat = 8  # Enumeration for uint8 type. See xtf_ctypes.py for other enum values
     c[1].ChannelNumber = 1
     c[1].SlantRange = 30
     c[1].Frequency = 340
     c[1].NumSamples = num_samples_per_ping
+    c[1].SampleFormat = 8  # Enumeration for uint8 type. See xtf_ctypes.py for other enum values
 
     p.ping_chan_headers = c
 
