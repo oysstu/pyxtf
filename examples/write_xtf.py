@@ -84,7 +84,7 @@ for i in range(num_pings):
     p.ping_chan_headers = c
 
     # Data
-    d0 = np.arange(0, num_samples_per_ping, dtype=np.uint8)*(i+1)
+    d0 = np.arange(0, num_samples_per_ping, dtype=np.uint8) * np.uint8(i % 255)
     d1 = d0[::-1]
     p.data = [d0, d1]
 
