@@ -201,6 +201,7 @@ def concatenate_channel(
     # Use numpy.vstack if the sizes are all the same
     if min_sz == max_sz:
         out_array = np.vstack([ping.data[channel] for ping in pings[::-1]])
+        print(out_array)
     else:
         # Get type of this channel
         chan_type = file_header.ChanInfo[pings[0].ping_chan_headers[channel].ChannelNumber].TypeOfChannel
@@ -225,7 +226,7 @@ def concatenate_channel(
 
     if weighted:
         weight_factors = [ping.ping_chan_headers[channel].Weight for ping in pings[::-1]]
-        out_array *= (2 ** -np.array(weight_factors)).astype(out_array.dtype)[:, np.newaxis]
+        out_array = np.multiply(out_array, np.power(2.0, -np.array(weight_factors))[:, np.newaxis]).astype(out_array.dtype)
 
     return out_array
 
