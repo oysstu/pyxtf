@@ -201,7 +201,6 @@ def concatenate_channel(
     # Use numpy.vstack if the sizes are all the same
     if min_sz == max_sz:
         out_array = np.vstack([ping.data[channel] for ping in pings[::-1]])
-        print(out_array)
     else:
         # Get type of this channel
         chan_type = file_header.ChanInfo[pings[0].ping_chan_headers[channel].ChannelNumber].TypeOfChannel
