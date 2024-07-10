@@ -11,7 +11,7 @@ def main():
 
     # Run setup script
     setup(name='pyxtf',
-          version='1.4.1',
+          version='1.4.2',
           description='eXtended Triton Format (XTF) file interface',
           long_description=long_description,
           long_description_content_type='text/markdown',
