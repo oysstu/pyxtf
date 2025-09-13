@@ -66,3 +66,6 @@ target/
 
 # Data folder
 data
+
+# Visual Code
+.vscode/
