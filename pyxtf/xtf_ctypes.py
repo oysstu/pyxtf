@@ -8,7 +8,7 @@ from warnings import warn
 
 import numpy as np
 
-from pyxtf.enumerations import *
+from pyxtf.enumerations import XTFHeaderType, XTFChannelType
 
 # General notes from the XTF format document (rev35)
 # 1. All structures should be zero-filled before use.
