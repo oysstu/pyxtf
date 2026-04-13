@@ -641,7 +641,8 @@ class XTFPingHeader(XTFPacketStart):
                 warn('XTFPingHeader (Reson7018) without any data encountered.')
 
             obj.data = samples
-
+        elif obj.HeaderType == XTFHeaderType.q_multibeam:
+            pass  # Implemented in XTFQPSMultibeam class
         else:
             # Generic XTFPingHeader construction
             n_bytes = obj.NumBytesThisRecord - ctypes.sizeof(XTFPingHeader)
@@ -729,7 +730,6 @@ class XTFQPSMultiTXEntry(XTFBase):
         ('Reserved', ctypes.c_float * 4)
     ]
 
-
 class XTFQPSMBEEntry(XTFBase):
     _pack_ = 1
     _fields_ = [
@@ -743,6 +743,42 @@ class XTFQPSMBEEntry(XTFBase):
         ('Reserved', ctypes.c_float * 4)
     ]
 
+class XTFQPSMultibeam(XTFPingHeader):
+    _pack_ = 1
+    _fields_ = []
+
+    @classmethod
+    def create_from_buffer(cls, buffer: IOBase, file_header=None):
+        obj = super().create_from_buffer(buffer=buffer, file_header=file_header)
+        if obj.MagicNumber != 0xFACE:
+            raise RuntimeError('XTF packet does not start with the correct identifier (0xFACE).')
+
+        # QPS Multibeam uses XTFBathHeader (XTFPingHeader) with QPSMBEEntry following
+
+        # Read the data that follows
+        bytes_remaining = obj.NumBytesThisRecord - ctypes.sizeof(XTFPingHeader)
+        samples = buffer.read(bytes_remaining)
+        if not samples:
+            warn('XTFQPSMultibeam without any data encountered.')
+
+        if bytes_remaining % ctypes.sizeof(XTFQPSMBEEntry) != 0:
+            warn('Number of bytes remaining after header is not a multiple of the size of \
+                  XTFQPSMBEEntry. Data may be malformed.')
+
+        # Processed bathy data consists of repeated XTFBeamXYZA structures
+        # Note: Using a ctypes array is a _lot_ faster than constructing a list of structs
+        num_entries = min(bytes_remaining // ctypes.sizeof(XTFQPSMBEEntry), obj.NumChansToFollow)
+        ctype_array = XTFQPSMBEEntry * num_entries
+        ctype_array._pack_ = 1
+        obj.data = ctype_array.from_buffer_copy(samples)
+
+        return obj
+
+    def __init__(self):
+        super().__init__()
+        self.MagicNumber = 0xFACE
+        self.HeaderType = XTFHeaderType.q_multibeam.value
+        self.data = []  # type: List[XTFQPSMultiTXEntry]
 
 class XTFRawCustomHeader(XTFPacket):
     _pack_ = 1
@@ -984,6 +1020,7 @@ XTFPacketClasses = {
     XTFHeaderType.raw_serial: XTFRawSerialHeader,
     XTFHeaderType.pos_raw_navigation: XTFPosRawNavigation,
     XTFHeaderType.q_singlebeam: XTFQPSSingleBeam,
+    XTFHeaderType.q_multibeam: XTFQPSMultibeam,
     XTFHeaderType.custom_vendor_data: XTFRawCustomHeader,
     XTFHeaderType.navigation: XTFHeaderNavigation,
     XTFHeaderType.gyro: XTFHeaderGyro,
