@@ -482,7 +482,7 @@ class XTFPingHeader(XTFPacketStart):
         ('JulianDay', ctypes.c_uint16),
         ('EventNumber', ctypes.c_uint32),
         ('PingNumber', ctypes.c_uint32),
-        ('SoundVelocity', ctypes.c_float),
+        ('SoundVelocity', ctypes.c_float), # Note: may be halved
         ('OceanTide', ctypes.c_float),
         ('Reserved2', ctypes.c_uint32),
         ('ConductivityFreq', ctypes.c_float),
@@ -492,7 +492,7 @@ class XTFPingHeader(XTFPacketStart):
         ('Conductivity', ctypes.c_float),
         ('WaterTemperature', ctypes.c_float),
         ('Pressure', ctypes.c_float),
-        ('ComputedSoundVelocity', ctypes.c_float),
+        ('ComputedSoundVelocity', ctypes.c_float), # Note: may be halved
         ('MagX', ctypes.c_float),
         ('MagY', ctypes.c_float),
         ('MagZ', ctypes.c_float),
